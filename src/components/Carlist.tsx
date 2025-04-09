@@ -1,10 +1,30 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import AddCar from "./AddCar";
 import { getCars, deleteCar } from "../api/carapi";
 import { DataGrid, GridColDef, GridCellParams } from "@mui/x-data-grid";
 import { Snackbar } from "@mui/material";
 
 function Carlist() {
+  const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+
+  const { data, error, isSuccess } = useQuery({
+    queryKey: ["cars"],
+    queryFn: getCars,
+  });
+
+  const { mutate } = useMutation({
+    mutationFn: deleteCar,
+    onSuccess: () => {
+      setOpen(true);
+      queryClient.invalidateQueries({ queryKey: ["cars"] });
+    },
+    onError: (err: unknown) => {
+      console.error("Error deleting row: ", err);
+    },
+  });
+
   const columns: GridColDef[] = [
     { field: "brand", headerName: "Brand", width: 200 },
     { field: "model", headerName: "Model", width: 200 },
@@ -38,25 +58,6 @@ function Carlist() {
       },
     },
   ];
-  const { data, error, isSuccess } = useQuery({
-    queryKey: ["cars"],
-    queryFn: getCars,
-  });
-
-  const queryClient = useQueryClient();
-
-  const { mutate } = useMutation({
-    mutationFn: deleteCar,
-    onSuccess: () => {
-      setOpen(true);
-      queryClient.invalidateQueries({ queryKey: ["cars"] });
-    },
-    onError: (err: unknown) => {
-      console.error("Error deleting row: ", err);
-    },
-  });
-
-  const [open, setOpen] = useState(false);
 
   if (!isSuccess) {
     return <span>Loading...</span>;
@@ -65,6 +66,7 @@ function Carlist() {
   } else {
     return (
       <>
+        <AddCar />
         <DataGrid
           rows={data}
           columns={columns}
