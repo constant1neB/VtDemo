@@ -21,7 +21,17 @@ function Carlist() {
       disableColumnMenu: true,
       renderCell: (params: GridCellParams) => {
         return (
-          <button onClick={() => mutate(params.row._links.car.href)}>
+          <button
+            onClick={() => {
+              if (
+                window.confirm(
+                  `Are you sure you want to delete ${params.row.brand} ${params.row.model}?`
+                )
+              ) {
+                mutate(params.row._links.car.href);
+              }
+            }}
+          >
             Delete
           </button>
         );
