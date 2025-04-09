@@ -30,8 +30,8 @@ function Carlist() {
     { field: "model", headerName: "Model", width: 200 },
     { field: "color", headerName: "Color", width: 200 },
     { field: "registrationNumber", headerName: "Registration #", width: 200 },
-    { field: "modelYear", headerName: "Model Year", width: 200 },
-    { field: "price", headerName: "Price", width: 200 },
+    { field: "modelYear", headerName: "Model Year", width: 150 },
+    { field: "price", headerName: "Price", width: 150 },
     {
       field: "delete",
       headerName: "",
