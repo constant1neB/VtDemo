@@ -65,8 +65,8 @@ function AddCar() {
         <DialogTitle>New car</DialogTitle>
         <CarDialogContent car={car} handleChange={handleChange} />
         <DialogActions>
-          <button onClick={handleClose}>Cancel</button>
-          <button onClick={handleSave}>Save</button>
+          <Button onClick={handleClose}>Cancel</Button>
+          <Button onClick={handleSave}>Save</Button>
         </DialogActions>
       </Dialog>
     </div>

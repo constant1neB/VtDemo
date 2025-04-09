@@ -3,6 +3,7 @@ import Dialog from "@mui/material/Dialog";
 import DialogActions from "@mui/material/DialogActions";
 import DialogTitle from "@mui/material/DialogTitle";
 import IconButton from "@mui/material/IconButton";
+import Button from "@mui/material/Button";
 import EditIcon from "@mui/icons-material/Edit";
 import { Car, CarResponse, CarEntry } from "../types";
 import { updateCar } from "../api/carapi";
@@ -80,8 +81,8 @@ function EditCar({ cardata }: FormProps) {
         <DialogTitle>Edit car</DialogTitle>
         <CarDialogContent car={car} handleChange={handleChange} />
         <DialogActions>
-          <button onClick={handleClose}>Cancel</button>
-          <button onClick={handleSave}>Save</button>
+          <Button onClick={handleClose}>Cancel</Button>
+          <Button onClick={handleSave}>Save</Button>
         </DialogActions>
       </Dialog>
     </>
