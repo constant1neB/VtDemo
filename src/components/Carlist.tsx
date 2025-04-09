@@ -2,7 +2,12 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import AddCar from "./AddCar";
 import { getCars, deleteCar } from "../api/carapi";
-import { DataGrid, GridColDef, GridCellParams } from "@mui/x-data-grid";
+import {
+  DataGrid,
+  GridColDef,
+  GridCellParams,
+  GridToolbar,
+} from "@mui/x-data-grid";
 import { Snackbar } from "@mui/material";
 import EditCar from "./EditCar";
 
@@ -80,7 +85,9 @@ function Carlist() {
         <DataGrid
           rows={data}
           columns={columns}
+          disableRowSelectionOnClick={true}
           getRowId={(row) => row._links.self.href}
+          slots={{ toolbar: GridToolbar }}
         />
         <Snackbar
           open={open}
