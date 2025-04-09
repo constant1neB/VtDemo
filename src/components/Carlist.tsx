@@ -9,6 +9,8 @@ import {
   GridToolbar,
 } from "@mui/x-data-grid";
 import { Snackbar } from "@mui/material";
+import IconButton from "@mui/material/IconButton";
+import DeleteIcon from "@mui/icons-material/Delete";
 import EditCar from "./EditCar";
 
 function Carlist() {
@@ -40,8 +42,8 @@ function Carlist() {
     { field: "price", headerName: "Price", width: 150 },
     {
       field: "edit",
-      headerName: "",
-      width: 90,
+      headerName: "Edit",
+      width: 70,
       sortable: false,
       filterable: false,
       disableColumnMenu: true,
@@ -49,14 +51,16 @@ function Carlist() {
     },
     {
       field: "delete",
-      headerName: "",
-      width: 90,
+      headerName: "Delete",
+      width: 70,
       sortable: false,
       filterable: false,
       disableColumnMenu: true,
       renderCell: (params: GridCellParams) => {
         return (
-          <button
+          <IconButton
+            aria-label="delete"
+            size="small"
             onClick={() => {
               if (
                 window.confirm(
@@ -67,8 +71,8 @@ function Carlist() {
               }
             }}
           >
-            Delete
-          </button>
+            <DeleteIcon fontSize="small" />
+          </IconButton>
         );
       },
     },
