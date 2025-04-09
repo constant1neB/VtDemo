@@ -17,8 +17,9 @@ function App() {
           <Typography variant="h6">Car Shop</Typography>
         </Toolbar>
       </AppBar>
-      <QueryClientProvider client={queryClient}></QueryClientProvider>
-      <Carlist />
+      <QueryClientProvider client={queryClient}>
+        <Carlist />
+      </QueryClientProvider>
     </Container>
   );
 }
