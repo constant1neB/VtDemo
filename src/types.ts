@@ -26,3 +26,8 @@ export type Car = {
   modelYear: number;
   price: number;
 };
+
+export type CarEntry = {
+  car: Car;
+  url: string;
+};
