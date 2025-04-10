@@ -57,7 +57,6 @@ function AddCar() {
 
   return (
     <div>
-      <br />
       <Button variant="contained" color="primary" onClick={handleClickOpen}>
         New Car
       </Button>

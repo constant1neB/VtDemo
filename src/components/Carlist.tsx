@@ -8,12 +8,18 @@ import {
   GridCellParams,
   GridToolbar,
 } from "@mui/x-data-grid";
+import Button from "@mui/material/Button";
+import Stack from "@mui/material/Stack";
 import { Snackbar } from "@mui/material";
 import IconButton from "@mui/material/IconButton";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditCar from "./EditCar";
 
-function Carlist() {
+type CarlistProps = {
+  logOut?: () => void;
+};
+
+function Carlist({ logOut }: CarlistProps) {
   const [open, setOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -85,7 +91,14 @@ function Carlist() {
   } else {
     return (
       <>
-        <AddCar />
+        <Stack
+          direction="row"
+          alignItems="center"
+          justifyContent="space-between"
+        >
+          <AddCar />
+          <Button onClick={logOut}>Log out</Button>
+        </Stack>
         <DataGrid
           rows={data}
           columns={columns}
