@@ -13,6 +13,11 @@ import Stack from "@mui/material/Stack";
 import { Snackbar } from "@mui/material";
 import IconButton from "@mui/material/IconButton";
 import DeleteIcon from "@mui/icons-material/Delete";
+import Dialog from "@mui/material/Dialog";
+import DialogActions from "@mui/material/DialogActions";
+import DialogContent from "@mui/material/DialogContent";
+import DialogContentText from "@mui/material/DialogContentText";
+import DialogTitle from "@mui/material/DialogTitle";
 import EditCar from "./EditCar";
 
 type CarlistProps = {
@@ -21,6 +26,7 @@ type CarlistProps = {
 
 function Carlist({ logOut }: CarlistProps) {
   const [open, setOpen] = useState(false);
+  const [openLogoutDialog, setOpenLogoutDialog] = useState(false);
   const queryClient = useQueryClient();
 
   const { data, error, isSuccess } = useQuery({
@@ -38,6 +44,21 @@ function Carlist({ logOut }: CarlistProps) {
       console.error("Error deleting row: ", err);
     },
   });
+
+  const handleOpenLogoutDialog = () => {
+    setOpenLogoutDialog(true);
+  };
+
+  const handleCloseLogoutDialog = () => {
+    setOpenLogoutDialog(false);
+  };
+
+  const handleConfirmLogout = () => {
+    if (logOut) {
+      logOut();
+    }
+    handleCloseLogoutDialog();
+  };
 
   const columns: GridColDef[] = [
     { field: "brand", headerName: "Brand", width: 200 },
@@ -97,7 +118,7 @@ function Carlist({ logOut }: CarlistProps) {
           justifyContent="space-between"
         >
           <AddCar />
-          <Button onClick={logOut}>Log out</Button>
+          <Button onClick={handleOpenLogoutDialog}>Log out</Button>
         </Stack>
         <DataGrid
           rows={data}
@@ -108,10 +129,31 @@ function Carlist({ logOut }: CarlistProps) {
         />
         <Snackbar
           open={open}
-          autoHideDuration={2000}
+          autoHideDuration={2500}
           onClose={() => setOpen(false)}
           message="Row deleted"
         />
+        <Dialog
+          open={openLogoutDialog}
+          onClose={handleCloseLogoutDialog}
+          aria-labelledby="logout-dialog-title"
+          aria-describedby="logout-dialog-description"
+        >
+          <DialogTitle id="logout-dialog-title">Confirm Logout</DialogTitle>
+          <DialogContent>
+            <DialogContentText id="logout-dialog-description">
+              Are you sure you want to log out?
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseLogoutDialog} color="primary">
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmLogout} color="primary" autoFocus>
+              Log Out
+            </Button>
+          </DialogActions>
+        </Dialog>
       </>
     );
   }

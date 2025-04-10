@@ -18,7 +18,11 @@ function Login() {
     username: "",
     password: "",
   });
-  const [isAuthenticated, setAuth] = useState(false);
+
+  const [isAuthenticated, setAuth] = useState(() => {
+    const token = sessionStorage.getItem("jwt");
+    return token ? true : false;
+  });
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setUser({ ...user, [event.target.name]: event.target.value });
@@ -40,8 +44,8 @@ function Login() {
   };
 
   const handleLogout = () => {
+    sessionStorage.removeItem("jwt");
     setAuth(false);
-    sessionStorage.setItem("jwt", "");
   };
 
   if (isAuthenticated) {
