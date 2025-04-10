@@ -19,6 +19,7 @@ function App() {
           <ThemeToggleButton />
         </Toolbar>
       </AppBar>
+      <br />
       <QueryClientProvider client={queryClient}>
         <Login />
       </QueryClientProvider>
