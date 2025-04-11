@@ -1,49 +1,43 @@
-import { createTheme } from "@mui/material/styles";
+import { extendTheme } from "@mui/material/styles";
 import "@mui/x-data-grid/themeAugmentation";
 
-//Dark theme
 const neonLime = "#39FF14";
 const darkCharcoal = "#1A1A1A";
 const paperDark = "#242424";
+const defaultMuiBlue = "#1976d2";
 
-//Light theme
-export const lightTheme = createTheme({
-  palette: {
-    mode: "light",
-    primary: {
-      main: "#1976d2", // Default MUI blue for light theme primary
-    },
-    // You can customize other light theme colors here if needed
-  },
-});
-
-// Dark Theme
-export const darkTheme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: {
-      main: neonLime,
-    },
-    background: {
-      default: darkCharcoal,
-      paper: paperDark,
-    },
-    text: {
-      primary: "#ffffff", // Ensure text is white/light gray
-      secondary: "#aaaaaa",
-    },
-  },
-  components: {
-    // Ensure DataGrid looks good in dark mode
-    MuiDataGrid: {
-      styleOverrides: {
-        root: {
-          // Optional: Add border if needed for contrast
-          // border: `1px solid ${paperDark}`,
+const theme = extendTheme({
+  cssVarPrefix: "mui",
+  colorSchemes: {
+    light: {
+      palette: {
+        primary: {
+          main: defaultMuiBlue,
         },
       },
     },
-    // Style buttons in dialogs to match theme
+    dark: {
+      palette: {
+        primary: {
+          main: neonLime,
+        },
+        background: {
+          default: darkCharcoal,
+          paper: paperDark,
+        },
+        text: {
+          primary: "#ffffff",
+          secondary: "#aaaaaa",
+        },
+      },
+    },
+  },
+  components: {
+    MuiDataGrid: {
+      styleOverrides: {
+        root: {}, // Keep empty or add specific styles
+      },
+    },
     MuiDialogActions: {
       styleOverrides: {
         root: {
@@ -52,4 +46,7 @@ export const darkTheme = createTheme({
       },
     },
   },
+  colorSchemeSelector: '[data-mui-color-scheme="%s"]', // Instructs to use data attribute
 });
+
+export default theme;
