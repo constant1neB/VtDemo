@@ -46,6 +46,7 @@ function Login() {
   const handleLogout = () => {
     sessionStorage.removeItem("jwt");
     setAuth(false);
+    setUser({ username: "", password: "" });
   };
 
   if (isAuthenticated) {
@@ -53,11 +54,17 @@ function Login() {
   } else {
     return (
       <Stack spacing={2} alignItems="center" mt={2}>
-        <TextField name="username" label="Username" onChange={handleChange} />
+        <TextField
+          name="username"
+          label="Username"
+          value={user.username}
+          onChange={handleChange}
+        />
         <TextField
           type="password"
           name="password"
           label="Password"
+          value={user.password}
           onChange={handleChange}
         />
         <Button variant="outlined" color="primary" onClick={handleLogin}>
