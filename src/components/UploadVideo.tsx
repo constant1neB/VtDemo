@@ -13,7 +13,7 @@ import Box from "@mui/material/Box";
 import Typography from "@mui/material/Typography";
 import {uploadVideo} from "../api/videoApi";
 import {ProblemDetail, VideoResponse} from "../types";
-import axios from "axios"; // Import axios for error type checking
+import axios from "axios";
 
 type UploadVideoProps = {
     open: boolean;
@@ -28,9 +28,9 @@ function UploadVideo({open, handleClose}: Readonly<UploadVideoProps>) {
     const [snackbarMessage, setSnackbarMessage] = useState<string>("");
 
     const {mutate: uploadMutate, isPending: isUploading} = useMutation<
-        VideoResponse, // Type that mutationFn returns
-        Error,         // Type of error mutationFn throws
-        { file: File; description: string | null } // Type of variables passed to mutationFn
+        VideoResponse,
+        Error,
+        { file: File; description: string | null }
     >({
         mutationFn: (vars) => uploadVideo(vars.file, vars.description), // Call the API function
         onSuccess: () => {
@@ -107,7 +107,7 @@ function UploadVideo({open, handleClose}: Readonly<UploadVideoProps>) {
                             Choose MP4 File{/**/}
                             <input
                                 type="file"
-                                hidden // Hide the default browser input
+                                hidden
                                 accept=".mp4,video/mp4" // Specify accepted types
                                 onChange={handleFileChange}
                             />
@@ -141,7 +141,6 @@ function UploadVideo({open, handleClose}: Readonly<UploadVideoProps>) {
                     </Button>
                 </DialogActions>
             </Dialog>
-            {/* Separate Snackbar for this component's feedback */}
             <Snackbar
                 open={snackbarOpen}
                 autoHideDuration={4000}

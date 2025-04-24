@@ -183,8 +183,6 @@ function ProcessVideoDialog({ open, handleClose, video }: Readonly<ProcessVideoD
         }
     };
 
-    // No need for separate prop variables anymore
-
     return (
         <>
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
@@ -206,12 +204,10 @@ function ProcessVideoDialog({ open, handleClose, video }: Readonly<ProcessVideoD
                             disabled={isProcessing}
                             error={!!startTimeError}
                             helperText={startTimeError || "e.g., 10.5 (leave blank for no cut)"}
-                            // Use slotProps.htmlInput
                             slotProps={{
                                 htmlInput: {
                                     inputMode: 'numeric',
                                     pattern: '[0-9]*(.[0-9]+)?',
-                                    // step: '0.1' // Optional step
                                 }
                             }}
                         />
@@ -227,7 +223,6 @@ function ProcessVideoDialog({ open, handleClose, video }: Readonly<ProcessVideoD
                             disabled={isProcessing}
                             error={!!endTimeError}
                             helperText={endTimeError || "e.g., 60 (leave blank for no cut)"}
-                            // Use slotProps.htmlInput
                             slotProps={{
                                 htmlInput: {
                                     inputMode: 'numeric',
@@ -248,7 +243,6 @@ function ProcessVideoDialog({ open, handleClose, video }: Readonly<ProcessVideoD
                             disabled={isProcessing}
                             error={!!resolutionError}
                             helperText={resolutionError || "e.g., 720 or 480 (leave blank for original)"}
-                            // Use slotProps.htmlInput
                             slotProps={{
                                 htmlInput: {
                                     inputMode: 'numeric',

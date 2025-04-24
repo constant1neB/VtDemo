@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Stack from "@mui/material/Stack";
@@ -7,8 +8,8 @@ import Snackbar from "@mui/material/Snackbar";
 import CircularProgress from "@mui/material/CircularProgress";
 import { RegistrationRequest } from '../types';
 import { register } from '../api/videoApi';
-// Import the helper function
-import { parseApiError } from '../utils/errorUtils';
+import { useApiFormSubmit } from '../hooks/useApiFormSubmit';
+import { AxiosResponse } from 'axios';
 
 function Register() {
     const [formData, setFormData] = useState<RegistrationRequest>({
@@ -17,58 +18,48 @@ function Register() {
         password: '',
         passwordConfirmation: '',
     });
-    const [isLoading, setIsLoading] = useState<boolean>(false);
-    const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
-    const [snackbarMessage, setSnackbarMessage] = useState<string>("");
-    const [isSuccess, setIsSuccess] = useState<boolean>(false); // Track success state
+
+    const navigate = useNavigate();
+
+    // Use the custom hook - CORRECTED TYPE ARGUMENT
+    const {
+        isLoading,
+        snackbarOpen,
+        snackbarMessage,
+        isSubmitted: isSuccess,
+        handleSubmit: handleApiSubmit,
+        closeSnackbar
+    } = useApiFormSubmit<RegistrationRequest, AxiosResponse>( // Use AxiosResponse here
+        register, // Pass the register API function
+        {
+            successMessage: "Registration successful! Please check your email to verify your account.",
+            onSuccess: () => {
+                // Clear form only on actual success
+                setFormData({ username: '', email: '', password: '', passwordConfirmation: '' });
+            }
+        }
+    );
 
     const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         setFormData({ ...formData, [event.target.name]: event.target.value });
     };
 
-    const handleRegister = async () => {
+    // Component's submit handler prepares data and calls the hook's handler
+    const handleRegisterSubmit = () => {
         // --- Initial Validations ---
         if (formData.password !== formData.passwordConfirmation) {
-            setSnackbarMessage("Passwords do not match.");
-            setSnackbarOpen(true);
+            // Rely on TextField error prop for immediate feedback
+            console.warn("Passwords do not match");
             return;
         }
         if (!formData.username || !formData.email || !formData.password) {
-            setSnackbarMessage("Please fill in all required fields.");
-            setSnackbarOpen(true);
+            // Rely on TextField required prop
+            console.warn("Please fill in all required fields.");
             return;
         }
 
-        // --- Reset State for New Attempt ---
-        setIsLoading(true);
-        setSnackbarMessage("");
-        setIsSuccess(false);
-
-        // --- API Call and Handling ---
-        try {
-            await register(formData); // Call API
-            setSnackbarMessage("Registration successful! Please check your email to verify your account.");
-            setSnackbarOpen(true);
-            setIsSuccess(true); // Set success flag
-            setFormData({ username: '', email: '', password: '', passwordConfirmation: '' }); // Clear form on success
-
-        } catch (error: unknown) {
-            console.error("Registration error:", error);
-            // Use the helper function to parse the error
-            const errorMessage = parseApiError(error, "Registration failed: An unexpected error occurred.");
-            setSnackbarMessage(errorMessage);
-            setSnackbarOpen(true);
-            setIsSuccess(false);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-    // --- End of Refactored handleRegister ---
-
-    // Placeholder navigation back to login
-    const handleGoToLogin = () => {
-        alert("Navigate back to Login Page (Not Implemented)");
-        // Later: Use React Router
+        // Call the hook's submit function
+        void handleApiSubmit(formData);
     };
 
     return (
@@ -76,7 +67,7 @@ function Register() {
             <Typography variant="h4" gutterBottom>Register</Typography>
             {isSuccess ? (
                 <Typography color="success.main" sx={{ textAlign: 'center', mb: 2 }}>
-                    Registration successful! Please check your email to complete verification.
+                    {snackbarMessage}
                 </Typography>
             ) : (
                 <>
@@ -84,19 +75,19 @@ function Register() {
                         name="username" label="Username" required
                         value={formData.username} onChange={handleChange}
                         disabled={isLoading} sx={{ width: '300px' }}
-                        autoComplete="username" // Add autocomplete hint
+                        autoComplete="username"
                     />
                     <TextField
                         name="email" label="Email" type="email" required
                         value={formData.email} onChange={handleChange}
                         disabled={isLoading} sx={{ width: '300px' }}
-                        autoComplete="email" // Add autocomplete hint
+                        autoComplete="email"
                     />
                     <TextField
                         name="password" label="Password" type="password" required
                         value={formData.password} onChange={handleChange}
                         disabled={isLoading} sx={{ width: '300px' }}
-                        autoComplete="new-password" // Add autocomplete hint
+                        autoComplete="new-password"
                     />
                     <TextField
                         name="passwordConfirmation" label="Confirm Password" type="password" required
@@ -104,23 +95,23 @@ function Register() {
                         disabled={isLoading} sx={{ width: '300px' }}
                         error={formData.password !== formData.passwordConfirmation && formData.passwordConfirmation !== ''}
                         helperText={formData.password !== formData.passwordConfirmation && formData.passwordConfirmation !== '' ? "Passwords do not match" : ""}
-                        autoComplete="new-password" // Add autocomplete hint
+                        autoComplete="new-password"
                     />
                     <Button
-                        variant="contained" color="primary" onClick={handleRegister}
+                        variant="contained" color="primary" onClick={handleRegisterSubmit} // Call the component's submit handler
                         disabled={isLoading} sx={{ width: '300px', height: '40px' }}
                     >
                         {isLoading ? <CircularProgress size={24} color="inherit" /> : "Register"}
                     </Button>
                 </>
             )}
-            <Button size="small" onClick={handleGoToLogin} disabled={isLoading}>
+            <Button size="small" onClick={() => navigate('/login')} disabled={isLoading && !isSuccess}>
                 Back to Login
             </Button>
             <Snackbar
-                open={snackbarOpen && !isSuccess} // Only show snackbar if not success message already shown
+                open={snackbarOpen}
                 autoHideDuration={6000}
-                onClose={() => setSnackbarOpen(false)}
+                onClose={closeSnackbar}
                 message={snackbarMessage}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             />

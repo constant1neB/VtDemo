@@ -1,6 +1,6 @@
-import { useState } from "react";
+import React, { useState } from "react"; // Added React import
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listVideos, deleteVideo, downloadVideo } from "../api/videoApi";
+import { listVideos, deleteVideo, downloadVideo } from "../api/videoApi"; // API calls use configured client
 import { formatFileSize, formatDuration, formatDate } from '../utils/formatters';
 import {
     DataGrid,
@@ -22,16 +22,17 @@ import EditVideoDescriptionDialog from "./EditVideoDescriptionDialog";
 import ProcessVideoDialog from "./ProcessVideoDialog";
 import { VideoResponse, VideoStatus } from "../types";
 import { AxiosResponse } from "axios";
-import { parseApiError } from '../utils/errorUtils';
+import { parseApiError } from '../utils/errorUtils'; // Import error parser
 
 
 interface VideoRowModel extends GridValidRowModel, VideoResponse {}
 
 type VideoListProps = {
-    logOut?: () => void;
+    logOut: () => void; // Changed prop name to be more explicit
 };
 
-function VideoList({ logOut }: Readonly<VideoListProps>) {
+// Use React.FC for component definition with props
+const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState("");
     const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
@@ -44,34 +45,30 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
     const queryClient = useQueryClient();
 
     // Fetch videos using React Query
-    const { data: videos, error, isLoading} = useQuery<VideoResponse[], Error>({
+    const { data: videos, error, isLoading } = useQuery<VideoResponse[], Error>({
         queryKey: ["videos"],
-        queryFn: listVideos,
-        staleTime: 1000 * 60, // Data considered stale after 1 minute
-        refetchInterval: 1000 * 15, // Refetch every 15 seconds (adjust as needed)
-        // Keep previous data while refetching for smoother UI
+        queryFn: listVideos, // Uses the configured apiClient via interceptors
+        staleTime: 1000 * 60,
+        refetchInterval: 1000 * 15,
         placeholderData: (previousData) => previousData,
     });
 
     // --- Delete Mutation ---
     const { mutate: deleteMutate, isPending: isDeleting } = useMutation<
-        void, // Explicitly void as we wrap the call
+        void,
         Error,
-        number // Pass video ID
+        number
     >({
-        // Wrap the API call to match the expected void return type
         mutationFn: async (id: number) => {
-            await deleteVideo(id);
+            await deleteVideo(id); // Uses the configured apiClient
         },
         onSuccess: (_, deletedVideoId) => {
             setSnackbarMessage(`Video ID ${deletedVideoId} deleted successfully.`);
             setSnackbarOpen(true);
-            // Invalidate queries - explicitly ignore promise
             void queryClient.invalidateQueries({ queryKey: ["videos"] });
         },
         onError: (error: Error, deletedVideoId) => {
             console.error(`Error deleting video ID ${deletedVideoId}:`, error);
-            // Use the centralized error parser
             const message = parseApiError(error, `Failed to delete video ID ${deletedVideoId}.`);
             setSnackbarMessage(message);
             setSnackbarOpen(true);
@@ -96,51 +93,44 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
         setSnackbarOpen(true);
 
         try {
+            // Uses the configured apiClient
             const response: AxiosResponse<Blob> = await downloadVideo(id);
             const url = window.URL.createObjectURL(response.data);
             const link = document.createElement('a');
             link.href = url;
 
-            // --- Improved Filename Logic ---
             const contentDisposition = response.headers['content-disposition'];
             let downloadFilename = `video-${id}.mp4`; // Default fallback
 
             if (contentDisposition) {
-                // More robust regex to handle quotes and potential variations
                 const filenameMatch = contentDisposition.match(/filename\*?=['"]?([^'";]+)['"]?/i);
                 if (filenameMatch?.[1]) {
-                    // Decode URI component for potentially encoded filenames (e.g., UTF-8)
                     try {
                         downloadFilename = decodeURIComponent(filenameMatch[1]);
                     } catch (decodeError) {
                         console.warn("Could not decode filename from Content-Disposition:", filenameMatch[1], decodeError);
-                        // Fallback to raw value if decoding fails
                         downloadFilename = filenameMatch[1];
                     }
                 }
             } else if (filename) {
-                // Sanitize filename from DB if content-disposition is missing
                 downloadFilename = filename.replace(/[^a-z0-9._-]/gi, '_').replace(/_{2,}/g, '_');
             }
-            // --- End Improved Filename Logic ---
 
             link.setAttribute('download', downloadFilename);
             document.body.appendChild(link);
-            link.click(); // Start download
+            link.click();
 
-            // Cleanup after click event loop finishes
             setTimeout(() => {
                 document.body.removeChild(link);
                 window.URL.revokeObjectURL(url);
                 console.debug(`Revoked object URL for video ID ${id}`);
-            }, 100); // Small delay ensures download starts
+            }, 100);
 
             setSnackbarMessage(`Download started for: ${downloadFilename}`);
             setSnackbarOpen(true);
 
         } catch (err: unknown) {
             console.error(`Error downloading video ID ${id}:`, err);
-            // Use the centralized error parser
             const message = parseApiError(err, `Failed to download video ID ${id}.`);
             setSnackbarMessage(message);
             setSnackbarOpen(true);
@@ -178,18 +168,15 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
     };
     // --- End Close Dialog Handlers ---
 
-    // Define DataGrid Columns using the specific row model type
+    // Define DataGrid Columns (same as before, just ensure types match VideoRowModel)
     const columns: GridColDef<VideoRowModel>[] = [
         { field: "id", headerName: "ID", width: 70 },
         {
             field: "description",
             headerName: "Description",
             width: 250,
-            valueGetter: (_value, row) => row.description ?? "---", // Access via row
-            // Use GridRenderCellParams with the correct Row type and expected Value type
+            valueGetter: (_value, row) => row.description ?? "---",
             renderCell: (params: GridRenderCellParams<VideoRowModel, string>) => (
-                // params.value should now be correctly typed as string | null
-                // Box children needs ReactNode, string is valid
                 <Box sx={{ whiteSpace: 'normal', lineHeight: 'normal', py: 1 }}>
                     {params.value}
                 </Box>
@@ -199,9 +186,8 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
             field: "status",
             headerName: "Status",
             width: 120,
-            // Use GridRenderCellParams; Value type is VideoStatus | undefined
             renderCell: (params: GridRenderCellParams<VideoRowModel, VideoStatus | undefined>) => {
-                const status = params.value; // Get status from params.value (derived from field)
+                const status = params.value;
                 let color: "default" | "warning" | "success" | "error" | "info" = "default";
                 switch (status) {
                     case VideoStatus.PROCESSING: color = "warning"; break;
@@ -209,7 +195,6 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
                     case VideoStatus.FAILED: color = "error"; break;
                     case VideoStatus.UPLOADED: color = "info"; break;
                 }
-                // Chip label expects ReactNode, string is valid.
                 return <Chip label={status ? String(status) : 'UNKNOWN'} color={color} size="small" />;
             }
         },
@@ -217,21 +202,20 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
             field: "fileSize",
             headerName: "Size",
             width: 110,
-            valueFormatter: (value: number | null | undefined) => formatFileSize(value), // Type value explicitly
+            valueFormatter: (value: number | null | undefined) => formatFileSize(value),
         },
         {
             field: "duration",
             headerName: "Duration",
             width: 100,
-            valueFormatter: (value: number | null | undefined) => formatDuration(value), // Type value explicitly
+            valueFormatter: (value: number | null | undefined) => formatDuration(value),
         },
         {
             field: "uploadDate",
             headerName: "Uploaded",
             width: 180,
-            // valueGetter is often safer than valueFormatter for complex types if direct field access is needed
-            valueGetter: (_value, row) => row.uploadDate, // Access via row
-            renderCell: (params: GridRenderCellParams<VideoRowModel, string | null | undefined>) => formatDate(params.value) // Format the value
+            valueGetter: (_value, row) => row.uploadDate,
+            renderCell: (params: GridRenderCellParams<VideoRowModel, string | null | undefined>) => formatDate(params.value)
         },
         { field: "generatedFilename", headerName: "Filename (Internal)", width: 200 },
         {
@@ -241,13 +225,11 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
             sortable: false,
             filterable: false,
             disableColumnMenu: true,
-            // Use GridRenderCellParams with the Row type. Value type doesn't matter here.
             renderCell: (params: GridRenderCellParams<VideoRowModel>) => {
-                const video = params.row; // Get the full video object
+                const video = params.row;
                 const isCurrentDownloading = downloadingId === video.id;
                 const canDownload = video.status === VideoStatus.READY || video.status === VideoStatus.UPLOADED;
                 const canProcess = video.status === VideoStatus.UPLOADED || video.status === VideoStatus.READY;
-                // Disable actions if deleting *any* video or downloading *this* video
                 const isActionDisabled = isDeleting || isCurrentDownloading;
 
                 return (
@@ -276,7 +258,7 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
                         <IconButton
                             aria-label="delete video" size="small" title="Delete Video"
                             onClick={() => handleDelete(video.id, video.description)}
-                            disabled={isActionDisabled} // Disable if any delete is pending
+                            disabled={isActionDisabled}
                         >
                             <DeleteIcon fontSize="small" />
                         </IconButton>
@@ -287,13 +269,12 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
     ];
 
     // --- Render Logic ---
-    if (isLoading && !videos) { // Show loading only if there's no previous data
+    if (isLoading && !videos) {
         return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>;
     }
     if (error) {
         return <Typography color="error" sx={{ mt: 4 }}>Error fetching videos: {error.message}</Typography>;
     }
-    // Handle case where fetching succeeded but returned no data or videos is undefined/null
     if (!videos) {
         return <Typography sx={{ mt: 4 }}>No videos found or could not load data.</Typography>;
     }
@@ -302,7 +283,7 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
         <Box sx={{
             display: 'flex',
             flexDirection: 'column',
-            height: 'calc(100vh - 150px)',
+            height: 'calc(100vh - 150px)', // Adjust height as needed
             width: '100%'
         }}>
             <Stack
@@ -318,15 +299,14 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
                 >
                     Upload New Video
                 </Button>
-                {logOut &&
-                    <Button
-                        variant="outlined"
-                        onClick={logOut}
-                        disabled={isDeleting || !!downloadingId}
-                    >
-                        Log out
-                    </Button>
-                }
+                {/* Use the logOut prop passed from App */}
+                <Button
+                    variant="outlined"
+                    onClick={logOut} // Use the passed function
+                    disabled={isDeleting || !!downloadingId}
+                >
+                    Log out
+                </Button>
             </Stack>
 
             <Box sx={{ flex: 1 }}>
@@ -348,25 +328,10 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
                     rowHeight={70}
                     sx={{
                         border: 0,
-                        '& .MuiDataGrid-columnHeaderTitleContainer': {
-                            justifyContent: 'flex-start',
-                        },
-                        '& .MuiDataGrid-columnHeaderTitle': {
-                            overflow: 'visible',
-                            lineHeight: 'normal',
-                            whiteSpace: 'normal',
-                            fontWeight: 'bold',
-                        },
-                        '& .MuiDataGrid-cell': {
-                            whiteSpace: 'normal !important',
-                            wordWrap: 'break-word !important',
-                            lineHeight: '1.4 !important',
-                            alignItems: 'center',
-                            py: 1,
-                        },
-                        '& .MuiDataGrid-cell[data-field="description"]': {
-                            alignItems: 'flex-start',
-                        },
+                        '& .MuiDataGrid-columnHeaderTitleContainer': { justifyContent: 'flex-start' },
+                        '& .MuiDataGrid-columnHeaderTitle': { overflow: 'visible', lineHeight: 'normal', whiteSpace: 'normal', fontWeight: 'bold' },
+                        '& .MuiDataGrid-cell': { whiteSpace: 'normal !important', wordWrap: 'break-word !important', lineHeight: '1.4 !important', alignItems: 'center', py: 1 },
+                        '& .MuiDataGrid-cell[data-field="description"]': { alignItems: 'flex-start' },
                     }}
                     loading={isLoading || isDeleting || !!downloadingId}
                 />
@@ -377,8 +342,6 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
                 open={isUploadDialogOpen}
                 handleClose={() => setIsUploadDialogOpen(false)}
             />
-
-            {/* Conditional rendering prevents passing null video */}
             {currentVideoToEdit && (
                 <EditVideoDescriptionDialog
                     open={isEditDialogOpen}
@@ -386,7 +349,6 @@ function VideoList({ logOut }: Readonly<VideoListProps>) {
                     video={currentVideoToEdit}
                 />
             )}
-
             {currentVideoToProcess && (
                 <ProcessVideoDialog
                     open={isProcessDialogOpen}
