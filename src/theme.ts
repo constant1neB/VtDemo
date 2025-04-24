@@ -4,7 +4,7 @@ import "@mui/x-data-grid/themeAugmentation";
 const neonLime = "#39FF14";
 const darkCharcoal = "#1A1A1A";
 const paperDark = "#242424";
-const defaultMuiBlue = "#1976d2";
+const royalPurple = "#7851a9";
 
 const theme = extendTheme({
   cssVarPrefix: "mui",
@@ -12,7 +12,7 @@ const theme = extendTheme({
     light: {
       palette: {
         primary: {
-          main: defaultMuiBlue,
+          main: royalPurple,
         },
       },
     },
