@@ -15,7 +15,7 @@ import axios from 'axios';
 type EditVideoDescriptionDialogProps = {
     open: boolean;
     handleClose: () => void;
-    video: VideoResponse | null; // Pass the whole video object
+    video: VideoResponse | null;
 };
 
 function EditVideoDescriptionDialog({ open, handleClose, video }: Readonly<EditVideoDescriptionDialogProps>) {
@@ -49,7 +49,6 @@ function EditVideoDescriptionDialog({ open, handleClose, video }: Readonly<EditV
                     queryKey: ['videos'],
                     refetchType: 'active', // Only refetch active queries
                 });
-
                 // Optionally update single item cache if needed:
                 // queryClient.setQueryData(['videos', updatedVideo.id], updatedVideo);
             } catch (error) {
@@ -122,7 +121,6 @@ function EditVideoDescriptionDialog({ open, handleClose, video }: Readonly<EditV
                     </Button>
                 </DialogActions>
             </Dialog>
-            {/* Snackbar for feedback */}
             <Snackbar
                 open={snackbarOpen}
                 autoHideDuration={4000}

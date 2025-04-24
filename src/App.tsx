@@ -1,49 +1,44 @@
 // src/App.tsx
-import { useState } from "react";
-import AppBar from "@mui/material/AppBar";
-import Toolbar from "@mui/material/Toolbar";
-import Typography from "@mui/material/Typography";
-import Container from "@mui/material/Container";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import Login from "./components/Login";
-import Register from "./components/Register";
-import ResendVerification from "./components/ResendVerification";
-import ThemeToggleButton from "./components/ThemeToggleButton";
-import Box from "@mui/material/Box";
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import AppBar from '@mui/material/AppBar';
+import Toolbar from '@mui/material/Toolbar';
+import Typography from '@mui/material/Typography';
+import Container from '@mui/material/Container';
+import Box from '@mui/material/Box';
 
-const queryClient = new QueryClient();
+import Login from './components/Login';
+import Register from './components/Register';
+import ResendVerification from './components/ResendVerification';
+import VideoList from './components/VideoList'; // Assuming VideoList is the main authenticated view
+import ThemeToggleButton from './components/ThemeToggleButton';
+import { useAuth } from './hooks/useAuth';
+import { useEffect } from 'react';
+import { initializeApiClient } from './api/videoApi';
 
-// Define possible view states
-type AuthView = "login" | "register" | "resend";
+// Component to handle protected routes
+function ProtectedRoute() {
+    const { isAuthenticated } = useAuth();
+    console.log("ProtectedRoute check: isAuthenticated =", isAuthenticated); // Debug log
+    return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
+}
+
+// Component to handle routes accessible only when logged out
+function PublicOnlyRoute() {
+    const { isAuthenticated } = useAuth();
+    console.log("PublicOnlyRoute check: isAuthenticated =", isAuthenticated); // Debug log
+    return !isAuthenticated ? <Outlet /> : <Navigate to="/" replace />;
+}
+
 
 function App() {
-    const [currentView] = useState<AuthView>("login");
-    const [isAuthenticated] = useState<boolean>(() => {
-        // Check initial auth state from sessionStorage
-        const token = sessionStorage.getItem("jwt");
-        return !!token;
-    });
+    const { token, logout } = useAuth(); // Get token and logout
 
-    // Function to render the correct component based on state
-    const renderAuthComponent = () => {
-        if (isAuthenticated) {
-            // Pass setAuth to Login/VideoList so it can trigger logout state change
-            return <Login />; // Login component internally handles showing VideoList when authenticated
-        }
-
-        switch (currentView) {
-            case "register":
-
-                return <Register />;
-            case "resend":
-
-                return <ResendVerification />;
-            case "login":
-            default:
-
-                return <Login />;
-        }
-    };
+    // Initialize the API client when the component mounts or auth state changes
+    useEffect(() => {
+        // Pass functions to get token and perform logout
+        initializeApiClient(() => token, logout);
+        console.log("API Client Initialized/Re-initialized.");
+    }, [token, logout]);
 
     return (
         <Container maxWidth="xl" sx={{ pt: 2 }}>
@@ -55,10 +50,27 @@ function App() {
                     <ThemeToggleButton />
                 </Toolbar>
             </AppBar>
-            <Box component="main" sx={{ mt: 4 }}> {/* Added Box and margin */}
-                <QueryClientProvider client={queryClient}>
-                    {renderAuthComponent()}
-                </QueryClientProvider>
+            <Box component="main" sx={{ mt: 4 }}>
+                <Routes>
+                    {/* Routes accessible only when logged OUT */}
+                    <Route element={<PublicOnlyRoute />}>
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
+                        <Route path="/resend-verification" element={<ResendVerification />} />
+                    </Route>
+
+                    {/* Routes accessible only when logged IN */}
+                    <Route element={<ProtectedRoute />}>
+                        {/* Pass logout function to VideoList */}
+                        <Route path="/" element={<VideoList logOut={logout} />} />
+                        {/* Add other protected routes here */}
+                    </Route>
+
+                    {/* Redirect root based on auth state (handled by Protected/Public routes now) */}
+                    {/* Fallback for unmatched routes (optional) */}
+                    <Route path="*" element={<Navigate to="/" replace />} />
+
+                </Routes>
             </Box>
         </Container>
     );
