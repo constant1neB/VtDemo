@@ -1,4 +1,3 @@
-// src/api/videoApi.ts
 import axios, {AxiosResponse, InternalAxiosRequestConfig} from "axios";
 import {
     AccountCredentials,
@@ -10,7 +9,7 @@ import {
 } from "../types";
 
 // --- Centralized Axios Instance ---
-const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080'; // Provide a default
+const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://localhost:8443'; // Provide a default
 
 const apiClient = axios.create({
     baseURL: API_BASE_URL,
@@ -24,32 +23,28 @@ export const setupRequestInterceptor = (getToken: () => string | null) => {
         (config: InternalAxiosRequestConfig) => {
             try {
                 const token = getToken();
-                if (token && !config.url?.endsWith('/login') && !config.url?.endsWith('/register') && !config.url?.endsWith('/resend-verification')) {
-                    // Ensure token includes "Bearer " prefix
+                // No need to add token for login/register/verify/resend/logout (logout is now public)
+                const publicPaths = ['/api/auth/login', '/api/auth/register', '/api/auth/verify-email', '/api/auth/resend-verification', '/api/auth/logout'];
+                const isPublicPath = publicPaths.some(path => config.url?.endsWith(path));
+
+                if (token && !isPublicPath) {
                     config.headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
                     console.debug("Interceptor: Added Auth token to request headers for URL:", config.url);
                 } else {
                     console.debug("Interceptor: No Auth token added for URL:", config.url);
                 }
-                // Set Content-Type for non-FormData requests
                 if (!(config.data instanceof FormData)) {
                     config.headers['Content-Type'] = 'application/json';
                 }
                 return config;
             } catch (error) {
-                // Convert any synchronous errors to rejected promises
-                const normalizedError = error instanceof Error
-                    ? error
-                    : new Error('Failed to process request configuration');
+                const normalizedError = error instanceof Error ? error : new Error('Failed to process request configuration');
                 return Promise.reject(normalizedError);
             }
         },
         (error) => {
             console.error("Request interceptor error:", error);
-            // Ensure we reject with an Error object
-            const normalizedError = error instanceof Error
-                ? error
-                : new Error(error?.message ?? 'Request interceptor failed');
+            const normalizedError = error instanceof Error ? error : new Error(error?.message ?? 'Request interceptor failed');
             return Promise.reject(normalizedError);
         }
     );
@@ -59,24 +54,24 @@ export const setupRequestInterceptor = (getToken: () => string | null) => {
 // Handles global errors, especially 401 for logout
 export const setupResponseInterceptor = (logoutAction: () => void) => {
     apiClient.interceptors.response.use(
-        (response) => response, // Pass through successful responses
+        (response) => response,
         (error) => {
             console.error("API Response Error:", error);
-
-            // Ensure we have a proper Error object
             const normalizedError = axios.isAxiosError(error)
                 ? error
                 : new Error(error?.message ?? 'Unknown API error');
 
             if (axios.isAxiosError(error) && error.response) {
                 const { status, config } = error.response;
-                // Check for 401 Unauthorized
-                if (status === 401 && config.url !== '/api/auth/login') { // Avoid logout loop on login failure
-                    console.warn("Interceptor: Received 401 Unauthorized. Logging out.");
+                // Check for 401 Unauthorized AND ensure it wasn't the logout or login request itself
+                if (status === 401 && config.url !== '/api/auth/logout' && config.url !== '/api/auth/login') {
+                    console.warn(`Interceptor: Received 401 Unauthorized for ${config.url}. Logging out.`);
                     logoutAction(); // Trigger logout from AuthContext
+                } else if (status === 401 && config.url === '/api/auth/logout') {
+                    // This case should ideally not happen now since logout is public, but keep check just in case
+                    console.warn(`Interceptor: Received 401 for public logout request itself. This shouldn't happen.`);
                 }
             }
-
             return Promise.reject(normalizedError);
         }
     );
@@ -98,6 +93,12 @@ export const register = async (data: RegistrationRequest): Promise<AxiosResponse
 
 export const resendVerification = async (data: ResendVerificationRequest): Promise<AxiosResponse> => {
     return apiClient.post(`/api/auth/resend-verification`, data);
+};
+
+export const logoutUser = async (): Promise<AxiosResponse> => { // Removed token parameter
+    // No Authorization header needed as endpoint is now public and skipped by filter
+    return apiClient.post('/api/auth/logout', {});
+    // withCredentials: true is still needed for the server to SET the clearing cookie
 };
 
 // --- Video Endpoints ---
