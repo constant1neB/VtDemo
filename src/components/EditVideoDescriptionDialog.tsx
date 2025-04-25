@@ -95,7 +95,7 @@ function EditVideoDescriptionDialog({ open, handleClose, video }: Readonly<EditV
     return (
         <>
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-                <DialogTitle>Edit Description (Video ID: {video?.id})</DialogTitle>
+                <DialogTitle>Edit Description</DialogTitle>
                 <DialogContent>
                     <TextField
                         autoFocus

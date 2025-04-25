@@ -1,7 +1,6 @@
-// src/context/AuthContext.tsx
-import React, { createContext, useState, useMemo, useCallback, ReactNode } from 'react';
+import React, {createContext, ReactNode, useCallback, useMemo, useState} from 'react';
+import { logoutUser } from '../api/videoApi';
 
-// Define the shape of the context data
 export interface AuthContextType {
     token: string | null;
     isAuthenticated: boolean;
@@ -9,12 +8,9 @@ export interface AuthContextType {
     logout: () => void;
 }
 
-// Create the context with an initial undefined value
-// Exporting the context itself is fine according to the rule
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Export ONLY the AuthProvider component from this file
-export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
     const [token, setToken] = useState<string | null>(null);
 
     const login = useCallback((newToken: string) => {
@@ -24,13 +20,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }, []);
 
     const logout = useCallback(() => {
-        setToken(null);
+        setToken(null); // Clear token from frontend state immediately
         console.log("AuthContext: Token removed from memory.");
-    }, []);
+
+        // Call the dedicated backend logout function (no token needed anymore)
+        logoutUser() // Call without parameters
+            .then(response => {
+                console.log("AuthContext: Backend logout successful (public endpoint).", response.status);
+            })
+            .catch(error => {
+                // Log error, but don't prevent frontend logout state change
+                console.error("AuthContext: Backend logout call failed (public endpoint):", error.response?.data ?? error.message);
+            });
+
+    }, []); // No dependencies needed
 
     const isAuthenticated = useMemo(() => !!token, [token]);
 
-    // Memoize the context value to prevent unnecessary re-renders
     const value = useMemo(() => ({
         token,
         isAuthenticated,

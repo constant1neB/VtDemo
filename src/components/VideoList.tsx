@@ -12,7 +12,7 @@ import {
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import Box from "@mui/material/Box";
-import { Snackbar, Chip, CircularProgress, Typography, IconButton } from "@mui/material";
+import { Snackbar, CircularProgress, Typography, IconButton } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import DownloadIcon from "@mui/icons-material/Download";
@@ -47,9 +47,8 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
     // Fetch videos using React Query
     const { data: videos, error, isLoading } = useQuery<VideoResponse[], Error>({
         queryKey: ["videos"],
-        queryFn: listVideos, // Uses the configured apiClient via interceptors
+        queryFn: listVideos,
         staleTime: 1000 * 60,
-        refetchInterval: 1000 * 15,
         placeholderData: (previousData) => previousData,
     });
 
@@ -170,33 +169,17 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
 
     // Define DataGrid Columns (same as before, just ensure types match VideoRowModel)
     const columns: GridColDef<VideoRowModel>[] = [
-        { field: "id", headerName: "ID", width: 70 },
         {
             field: "description",
             headerName: "Description",
-            width: 250,
+            flex: 1,
+            minWidth: 250,
             valueGetter: (_value, row) => row.description ?? "---",
             renderCell: (params: GridRenderCellParams<VideoRowModel, string>) => (
                 <Box sx={{ whiteSpace: 'normal', lineHeight: 'normal', py: 1 }}>
                     {params.value}
                 </Box>
             )
-        },
-        {
-            field: "status",
-            headerName: "Status",
-            width: 120,
-            renderCell: (params: GridRenderCellParams<VideoRowModel, VideoStatus | undefined>) => {
-                const status = params.value;
-                let color: "default" | "warning" | "success" | "error" | "info" = "default";
-                switch (status) {
-                    case VideoStatus.PROCESSING: color = "warning"; break;
-                    case VideoStatus.READY: color = "success"; break;
-                    case VideoStatus.FAILED: color = "error"; break;
-                    case VideoStatus.UPLOADED: color = "info"; break;
-                }
-                return <Chip label={status ? String(status) : 'UNKNOWN'} color={color} size="small" />;
-            }
         },
         {
             field: "fileSize",
@@ -217,11 +200,10 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
             valueGetter: (_value, row) => row.uploadDate,
             renderCell: (params: GridRenderCellParams<VideoRowModel, string | null | undefined>) => formatDate(params.value)
         },
-        { field: "generatedFilename", headerName: "Filename (Internal)", width: 200 },
         {
             field: "actions",
             headerName: "Actions",
-            width: 200,
+            width: 180,
             sortable: false,
             filterable: false,
             disableColumnMenu: true,
