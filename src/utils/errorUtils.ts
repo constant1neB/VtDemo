@@ -9,29 +9,40 @@ export function parseApiError(error: unknown, defaultMessage: string = "An unexp
     if (axios.isAxiosError(error) && error.response) {
         const status = error.response.status;
         const problem = error.response.data as ProblemDetail | undefined;
-        const detail = problem?.detail ?? error.message; // Fallback to Axios error message if detail is missing
+        const detail = problem?.detail ?? error.message;
 
-        if (status === 400) {
-            const validationErrors = problem?.errors;
-            if (validationErrors && typeof validationErrors === 'object' && Object.keys(validationErrors).length > 0) {
-                // Avoid nested template literal: Build the error string parts first
-                const errorMessages = Object.entries(validationErrors)
-                    .map(([field, msg]) => `${field}: ${msg}`); // Create "field: message" strings
-                return `Validation failed: ${errorMessages.join(', ')}`; // Join them
-            } else {
-                // Use detail if available, otherwise a generic 400 message
-                return `Registration failed: ${detail ?? 'Invalid input.'}`;
+        switch (status) {
+            case 400: { // Bad Request (often validation)
+                const validationErrors = problem?.errors;
+                if (validationErrors && typeof validationErrors === 'object' && Object.keys(validationErrors).length > 0) {
+                    const errorMessages = Object.entries(validationErrors)
+                        .map(([field, msg]) => `${field.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}: ${msg}`)
+                        .join('. ');
+                    return `Validation failed: ${errorMessages}.`;
+                }
+                return `Operation failed: ${detail ?? 'Invalid input.'} (Status: ${status})`;
             }
-        } else if (status === 409) {
-            return `Registration failed: ${detail ?? 'Username or email already exists or is pending verification.'}`;
-        } else {
-            // For other HTTP errors, include status and detail/message
-            return `Registration failed: ${detail} (Status: ${status})`;
+
+            case 401:
+                return `Authentication failed: ${detail ?? 'Please check credentials or log in.'}`;
+
+            case 403:
+                return `Forbidden: ${detail ?? 'You do not have permission.'}`;
+
+            case 404:
+                return `Not Found: ${detail ?? 'Resource not found.'}`;
+
+            case 409:
+                return `Conflict: ${detail ?? 'Operation could not be completed due to a conflict.'}`;
+
+            case 413:
+                return `Failed: ${detail ?? 'File size exceeds limit.'}`;
+
+            default:
+                return `Operation failed: ${detail ?? 'Server error.'} (Status: ${status})`;
         }
     } else if (error instanceof Error) {
-        // Handle standard JavaScript errors
         return `Operation failed: ${error.message}`;
     }
-    // Fallback for unknown error types
     return defaultMessage;
 }
