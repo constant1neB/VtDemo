@@ -61,14 +61,13 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
         mutationFn: async (id: number) => {
             await deleteVideo(id); // Uses the configured apiClient
         },
-        onSuccess: (_, deletedVideoId) => {
-            setSnackbarMessage(`Video ID ${deletedVideoId} deleted successfully.`);
+        onSuccess: () => {
+            setSnackbarMessage(`Video deleted successfully.`);
             setSnackbarOpen(true);
             void queryClient.invalidateQueries({ queryKey: ["videos"] });
         },
-        onError: (error: Error, deletedVideoId) => {
-            console.error(`Error deleting video ID ${deletedVideoId}:`, error);
-            const message = parseApiError(error, `Failed to delete video ID ${deletedVideoId}.`);
+        onError: () => {
+            const message = parseApiError(`Failed to delete video.`);
             setSnackbarMessage(message);
             setSnackbarOpen(true);
         },
@@ -87,8 +86,7 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
             return;
         }
 
-        setDownloadingId(id);
-        setSnackbarMessage(`Preparing download for video ID: ${id}...`);
+        setSnackbarMessage(`Preparing download`);
         setSnackbarOpen(true);
 
         try {
@@ -148,12 +146,18 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
         setIsProcessDialogOpen(true);
     };
 
-    const handleDelete = (id: number, description: string | null) => {
-        const videoLabel = description ? `"${description}" (ID: ${id})` : `Video ID: ${id}`;
-        if (window.confirm(`Are you sure you want to delete ${videoLabel}? This action cannot be undone.`)) {
+    const handleDelete = (id: number) => {
+        if (window.confirm(`Are you sure you want to delete this video? This action cannot be undone.`)) {
             deleteMutate(id);
         }
     };
+
+    const handleLogout = () => {
+        if (window.confirm("Are you sure you want to log out?")) {
+            logOut();
+        }
+    };
+
     // --- End Action Handlers ---
 
     // --- Close Dialog Handlers ---
@@ -239,7 +243,7 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
                         </IconButton>
                         <IconButton
                             aria-label="delete video" size="small" title="Delete Video"
-                            onClick={() => handleDelete(video.id, video.description)}
+                            onClick={() => handleDelete(video.id)}
                             disabled={isActionDisabled}
                         >
                             <DeleteIcon fontSize="small" />
@@ -281,10 +285,9 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
                 >
                     Upload New Video
                 </Button>
-                {/* Use the logOut prop passed from App */}
                 <Button
                     variant="outlined"
-                    onClick={logOut} // Use the passed function
+                    onClick={handleLogout}
                     disabled={isDeleting || !!downloadingId}
                 >
                     Log out

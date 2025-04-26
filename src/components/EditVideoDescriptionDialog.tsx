@@ -9,8 +9,8 @@ import TextField from '@mui/material/TextField';
 import Snackbar from '@mui/material/Snackbar';
 import CircularProgress from '@mui/material/CircularProgress';
 import { updateVideoDescription } from '../api/videoApi';
-import { VideoResponse, UpdateVideoRequest, ProblemDetail } from '../types';
-import axios from 'axios';
+import { VideoResponse, UpdateVideoRequest } from '../types';
+import {parseApiError} from "../utils/errorUtils.ts";
 
 type EditVideoDescriptionDialogProps = {
     open: boolean;
@@ -61,25 +61,9 @@ function EditVideoDescriptionDialog({ open, handleClose, video }: Readonly<EditV
         },
         onError: (error: Error) => {
             console.error(`Error updating description for video ID ${video?.id}:`, error);
-            let message;
-            if (axios.isAxiosError(error) && error.response) {
-                const status = error.response.status;
-                const problem = error.response.data as ProblemDetail | undefined;
-                if (status === 400) { // Validation error
-                    message = `Update failed: ${problem?.detail ?? 'Invalid description.'}`;
-                } else if (status === 403) {
-                    message = `Update failed: Permission denied. (ID: ${video?.id})`;
-                } else if (status === 404) {
-                    message = `Update failed: Video not found. (ID: ${video?.id})`;
-                } else {
-                    message = `Update failed: ${problem?.detail ?? error.message} (Status: ${status}, ID: ${video?.id})`;
-                }
-            } else {
-                message = `Update failed: ${error.message} (ID: ${video?.id})`;
-            }
+            const message = parseApiError(error, `Update failed for video ID ${video?.id}.`);
             setSnackbarMessage(message);
             setSnackbarOpen(true);
-            // Keep dialog open on error
         },
     });
 
