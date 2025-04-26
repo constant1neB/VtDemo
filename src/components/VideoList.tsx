@@ -1,6 +1,6 @@
 import React, { useState } from "react"; // Added React import
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listVideos, deleteVideo, downloadVideo } from "../api/videoApi"; // API calls use configured client
+import { listVideos, deleteVideo, downloadVideo } from "../api/videoApi";
 import { formatFileSize, formatDuration, formatDate } from '../utils/formatters';
 import {
     DataGrid,
@@ -22,7 +22,7 @@ import EditVideoDescriptionDialog from "./EditVideoDescriptionDialog";
 import ProcessVideoDialog from "./ProcessVideoDialog";
 import { VideoResponse, VideoStatus } from "../types";
 import { AxiosResponse } from "axios";
-import { parseApiError } from '../utils/errorUtils'; // Import error parser
+import { parseApiError } from '../utils/errorUtils';
 
 
 interface VideoRowModel extends GridValidRowModel, VideoResponse {}
@@ -31,12 +31,11 @@ type VideoListProps = {
     logOut: () => void; // Changed prop name to be more explicit
 };
 
-// Use React.FC for component definition with props
 const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState("");
     const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-    const [downloadingId, setDownloadingId] = useState<number | null>(null);
+    const [downloadingId, setDownloadingId] = useState<string | null>(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [currentVideoToEdit, setCurrentVideoToEdit] = useState<VideoResponse | null>(null);
     const [isProcessDialogOpen, setIsProcessDialogOpen] = useState(false);
@@ -56,10 +55,10 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
     const { mutate: deleteMutate, isPending: isDeleting } = useMutation<
         void,
         Error,
-        number
+        string
     >({
-        mutationFn: async (id: number) => {
-            await deleteVideo(id); // Uses the configured apiClient
+        mutationFn: async (publicId: string) => {
+            await deleteVideo(publicId); // Uses the configured apiClient
         },
         onSuccess: () => {
             setSnackbarMessage(`Video deleted successfully.`);
@@ -79,25 +78,24 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
         setIsEditDialogOpen(true);
     };
 
-    const handleDownload = async (id: number, status: VideoStatus, filename: string | null) => {
+    const handleDownload = async (publicId: string, status: VideoStatus) => {
         if (status !== VideoStatus.READY && status !== VideoStatus.UPLOADED) {
             setSnackbarMessage("Video is not ready or available for download.");
             setSnackbarOpen(true);
             return;
         }
-
         setSnackbarMessage(`Preparing download`);
         setSnackbarOpen(true);
 
         try {
             // Uses the configured apiClient
-            const response: AxiosResponse<Blob> = await downloadVideo(id);
+            const response: AxiosResponse<Blob> = await downloadVideo(publicId);
             const url = window.URL.createObjectURL(response.data);
             const link = document.createElement('a');
             link.href = url;
 
             const contentDisposition = response.headers['content-disposition'];
-            let downloadFilename = `video-${id}.mp4`; // Default fallback
+            let downloadFilename = `video-${publicId}.mp4`; // Default fallback
 
             if (contentDisposition) {
                 const filenameMatch = contentDisposition.match(/filename\*?=['"]?([^'";]+)['"]?/i);
@@ -109,8 +107,6 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
                         downloadFilename = filenameMatch[1];
                     }
                 }
-            } else if (filename) {
-                downloadFilename = filename.replace(/[^a-z0-9._-]/gi, '_').replace(/_{2,}/g, '_');
             }
 
             link.setAttribute('download', downloadFilename);
@@ -120,15 +116,15 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
             setTimeout(() => {
                 document.body.removeChild(link);
                 window.URL.revokeObjectURL(url);
-                console.debug(`Revoked object URL for video ID ${id}`);
+                console.debug(`Revoked object URL for video ID ${publicId}`);
             }, 100);
 
-            setSnackbarMessage(`Download started for: ${downloadFilename}`);
+            setSnackbarMessage(`Download started`);
             setSnackbarOpen(true);
 
         } catch (err: unknown) {
-            console.error(`Error downloading video ID ${id}:`, err);
-            const message = parseApiError(err, `Failed to download video ID ${id}.`);
+            console.error(`Error downloading video ID ${publicId}:`, err);
+            const message = parseApiError(err, `Failed to download video`);
             setSnackbarMessage(message);
             setSnackbarOpen(true);
         } finally {
@@ -146,9 +142,9 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
         setIsProcessDialogOpen(true);
     };
 
-    const handleDelete = (id: number) => {
+    const handleDelete = (publicId: string) => {
         if (window.confirm(`Are you sure you want to delete this video? This action cannot be undone.`)) {
-            deleteMutate(id);
+            deleteMutate(publicId);
         }
     };
 
@@ -213,7 +209,7 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
             disableColumnMenu: true,
             renderCell: (params: GridRenderCellParams<VideoRowModel>) => {
                 const video = params.row;
-                const isCurrentDownloading = downloadingId === video.id;
+                const isCurrentDownloading = downloadingId === video.publicId;
                 const canDownload = video.status === VideoStatus.READY || video.status === VideoStatus.UPLOADED;
                 const canProcess = video.status === VideoStatus.UPLOADED || video.status === VideoStatus.READY;
                 const isActionDisabled = isDeleting || isCurrentDownloading;
@@ -230,7 +226,7 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
                         <IconButton
                             aria-label="download video" size="small" title="Download Video"
                             disabled={isActionDisabled || !canDownload}
-                            onClick={() => handleDownload(video.id, video.status, video.generatedFilename)}
+                            onClick={() => handleDownload(video.publicId, video.status)}
                         >
                             {isCurrentDownloading ? <CircularProgress size={20} /> : <DownloadIcon fontSize="small" />}
                         </IconButton>
@@ -243,7 +239,7 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
                         </IconButton>
                         <IconButton
                             aria-label="delete video" size="small" title="Delete Video"
-                            onClick={() => handleDelete(video.id)}
+                            onClick={() => handleDelete(video.publicId)}
                             disabled={isActionDisabled}
                         >
                             <DeleteIcon fontSize="small" />
@@ -298,7 +294,7 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
                 <DataGrid
                     rows={videos}
                     columns={columns}
-                    getRowId={(row) => row.id}
+                    getRowId={(row) => row.publicId}
                     disableRowSelectionOnClick={true}
                     slots={{ toolbar: GridToolbar }}
                     initialState={{

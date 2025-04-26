@@ -124,28 +124,23 @@ export const uploadVideo = async (file: File, description: string | null): Promi
     return response.data;
 };
 
-export const getVideoDetails = async (id: number): Promise<VideoResponse> => {
-    const response = await apiClient.get<VideoResponse>(`/api/videos/${id}`);
-    return response.data;
-};
-
-export const downloadVideo = async (id: number): Promise<AxiosResponse<Blob>> => {
-    return apiClient.get<Blob>(`/api/videos/${id}/download`, {
+export const downloadVideo = async (publicId: string): Promise<AxiosResponse<Blob>> => {
+    return apiClient.get<Blob>(`/api/videos/${publicId}/download`, {
         responseType: "blob",
     });
 };
 
-export const updateVideoDescription = async (id: number, data: UpdateVideoRequest): Promise<VideoResponse> => {
-    const response = await apiClient.put<VideoResponse>(`/api/videos/${id}`, data);
+export const updateVideoDescription = async (publicId: string, data: UpdateVideoRequest): Promise<VideoResponse> => {
+    const response = await apiClient.put<VideoResponse>(`/api/videos/${publicId}`, data);
     return response.data;
 };
 
-export const deleteVideo = async (id: number): Promise<AxiosResponse> => {
-    return apiClient.delete(`/api/videos/${id}`);
+export const deleteVideo = async (publicId: string): Promise<AxiosResponse> => {
+    return apiClient.delete(`/api/videos/${publicId}`);
 };
 
-export const processVideo = async (id: number, options: EditOptions): Promise<AxiosResponse> => {
-    return apiClient.post(`/api/videos/${id}/process`, options);
+export const processVideo = async (publicId: string, options: EditOptions): Promise<AxiosResponse> => {
+    return apiClient.post(`/api/videos/${publicId}/process`, options);
 };
 
 // --- Setup Call (to be called near App root) ---

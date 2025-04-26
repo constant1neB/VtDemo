@@ -36,11 +36,11 @@ function EditVideoDescriptionDialog({ open, handleClose, video }: Readonly<EditV
     const { mutate: updateMutate, isPending: isUpdating } = useMutation<
         VideoResponse,
         Error,
-        { id: number; data: UpdateVideoRequest }
+        { publicId: string; data: UpdateVideoRequest }
     >({
-        mutationFn: (vars) => updateVideoDescription(vars.id, vars.data),
-        onSuccess: async (updatedVideo) => {
-            setSnackbarMessage(`Description updated for video ID: ${updatedVideo.id}`);
+        mutationFn: (vars) => updateVideoDescription(vars.publicId, vars.data),
+        onSuccess: async () => {
+            setSnackbarMessage(`Description updated`);
             setSnackbarOpen(true);
 
             try {
@@ -60,8 +60,8 @@ function EditVideoDescriptionDialog({ open, handleClose, video }: Readonly<EditV
             }
         },
         onError: (error: Error) => {
-            console.error(`Error updating description for video ID ${video?.id}:`, error);
-            const message = parseApiError(error, `Update failed for video ID ${video?.id}.`);
+            console.error(`Error updating description for video ID ${video?.publicId}:`, error);
+            const message = parseApiError(error, `Update failed`);
             setSnackbarMessage(message);
             setSnackbarOpen(true);
         },
@@ -72,8 +72,8 @@ function EditVideoDescriptionDialog({ open, handleClose, video }: Readonly<EditV
     };
 
     const handleSave = () => {
-        if (!video) return; // Should not happen if dialog is open correctly
-        updateMutate({ id: video.id, data: { description } });
+        if (!video?.publicId) return;
+        updateMutate({ publicId: video.publicId, data: { description } });
     };
 
     return (
