@@ -31,15 +31,12 @@ export enum VideoStatus {
 // NOTE: Added 'status' and 'uploadDate' based on Video.java and likely need
 // Adjust if backend VideoResponse DTO is different
 export type VideoResponse = {
-  id: number; // Changed from Long to number for TS
+  publicId: string; // Changed from Long to number for TS
   description: string | null; // Allow null description
-  ownerUsername: string;
   fileSize: number; // Changed from Long to number
   status: VideoStatus; // Added based on Video.java entity
   uploadDate: string; // ISO 8601 string from Instant
-  generatedFilename: string; // Added based on Video.java
   duration: number | null; // Added based on Video.java
-  // mimeType: string; // Could add if needed
 };
 
 export type UpdateVideoRequest = {
