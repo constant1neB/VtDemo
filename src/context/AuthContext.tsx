@@ -1,5 +1,5 @@
 import React, {createContext, ReactNode, useCallback, useMemo, useState} from 'react';
-import { logoutUser } from '../api/videoApi';
+import {logoutUser} from '../api/videoApi';
 
 export interface AuthContextType {
     token: string | null;
@@ -31,9 +31,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({children}) => {
             .catch(error => {
                 // Log error, but don't prevent frontend logout state change
                 console.error("AuthContext: Backend logout call failed (public endpoint):", error.response?.data ?? error.message);
+            })
+            .finally(() => {
+                console.log("AuthContext: Reloading page after logout attempt.");
+                window.location.reload();
             });
 
-    }, []); // No dependencies needed
+    }, []);
 
     const isAuthenticated = useMemo(() => !!token, [token]);
 
