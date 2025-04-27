@@ -6,7 +6,9 @@ import {
     ResendVerificationRequest,
     UpdateVideoRequest,
     VideoResponse,
+    PaginatedVideoResponse
 } from "../types";
+import { GridPaginationModel, GridSortModel } from '@mui/x-data-grid';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL ?? 'https://localhost:8443'; // Provide a default
 
@@ -119,8 +121,34 @@ export const logoutUser = async (): Promise<AxiosResponse> => {
 
 // --- Video Endpoints ---
 
-export const listVideos = async (): Promise<VideoResponse[]> => {
-    const response = await apiClient.get<VideoResponse[]>(`/api/videos`);
+interface ListVideoParams {
+    paginationModel: GridPaginationModel; // { page: number, pageSize: number }
+    sortModel: GridSortModel; // [{ field: string, sort: 'asc' | 'desc' }]
+}
+
+export const listVideos = async (params: ListVideoParams): Promise<PaginatedVideoResponse> => {
+    const { page, pageSize } = params.paginationModel;
+    const sortParams = new URLSearchParams();
+    if (params.sortModel.length > 0) {
+        const { field, sort } = params.sortModel[0];
+        sortParams.append('sort', `${field},${sort}`);
+    } else {
+        // Default sort if needed, e.g., by upload date descending
+        sortParams.append('sort', 'uploadDate,desc');
+    }
+
+    // Construct query parameters for Spring Pageable
+    const queryParams = new URLSearchParams({
+        page: page.toString(),
+        size: pageSize.toString(),
+    });
+
+    // Append sort parameters
+    sortParams.forEach((value, key) => queryParams.append(key, value));
+
+
+    const response = await apiClient.get<PaginatedVideoResponse>(`/api/videos?${queryParams.toString()}`);
+    console.debug("listVideos API response:", response.data); // Log the response
     return response.data;
 };
 

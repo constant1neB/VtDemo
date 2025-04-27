@@ -19,6 +19,41 @@ export type ResendVerificationRequest = {
 
 // --- Video Management ---
 
+// --- Backend Response Structures ---
+export interface Pageable {
+  pageNumber: number;
+  pageSize: number;
+  sort: {
+    sorted: boolean;
+    unsorted: boolean;
+    empty: boolean;
+  };
+  offset: number;
+  paged: boolean;
+  unpaged: boolean;
+}
+
+export interface PaginatedResponse<T> {
+  content: T[]; // The actual data for the current page
+  pageable: Pageable;
+  totalPages: number;
+  totalElements: number; // IMPORTANT for DataGrid rowCount
+  last: boolean;
+  size: number;
+  number: number; // Current page number (0-indexed)
+  sort: {
+    sorted: boolean;
+    unsorted: boolean;
+    empty: boolean;
+  };
+  numberOfElements: number; // Number of elements on the current page
+  first: boolean;
+  empty: boolean;
+}
+
+// Specific type for video list response
+export type PaginatedVideoResponse = PaginatedResponse<VideoResponse>;
+
 // Matches backend Video.java VideoStatus enum
 export enum VideoStatus {
   UPLOADED = "UPLOADED",

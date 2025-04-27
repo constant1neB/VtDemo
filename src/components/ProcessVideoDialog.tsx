@@ -5,7 +5,7 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import Button from '@mui/material/Button';
-import TextField, {TextFieldProps} from '@mui/material/TextField'; // Keep TextFieldProps import
+import TextField, {TextFieldProps} from '@mui/material/TextField';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Box from '@mui/material/Box';
@@ -23,15 +23,6 @@ type ProcessVideoDialogProps = {
 };
 
 type FieldType = 'startTime' | 'endTime' | 'resolution';
-
-type CustomTextFieldProps = Omit<TextFieldProps, 'variant'> & {
-    inputProps?: {
-        inputMode?: 'numeric' | 'text' | 'decimal' | 'none' | 'tel' | 'url' | 'email' | 'search';
-        pattern?: string;
-        min?: string | number;
-        step?: string | number;
-    };
-};
 
 function ProcessVideoDialog({open, handleClose, video}: Readonly<ProcessVideoDialogProps>) {
     const queryClient = useQueryClient();
@@ -222,14 +213,20 @@ function ProcessVideoDialog({open, handleClose, video}: Readonly<ProcessVideoDia
         }
     };
 
-    const inputProps: Record<FieldType, CustomTextFieldProps> = {
+    const inputProps: Record<FieldType, Omit<TextFieldProps, 'variant'>> = {
         startTime: {
             id: "cutStartTime",
             label: "Cut Start Time (seconds)",
             value: options.cutStartTime ?? '',
             onChange: handleStartTimeChange,
             error: !!errors.startTime,
-            inputProps: {inputMode: 'decimal', step: '0.1'}
+            helperText: errors.startTime,
+            InputProps: {
+                inputProps: {
+                    inputMode: 'decimal',
+                    step: '0.1'
+                }
+            }
         },
         endTime: {
             id: "cutEndTime",
@@ -238,7 +235,12 @@ function ProcessVideoDialog({open, handleClose, video}: Readonly<ProcessVideoDia
             onChange: handleEndTimeChange,
             error: !!errors.endTime,
             helperText: errors.endTime || "(leave blank for no cut)",
-            inputProps: {inputMode: 'decimal', step: '0.1'}
+            InputProps: {
+                inputProps: {
+                    inputMode: 'decimal',
+                    step: '0.1'
+                }
+            }
         },
         resolution: {
             id: "targetResolutionHeight",
@@ -247,7 +249,13 @@ function ProcessVideoDialog({open, handleClose, video}: Readonly<ProcessVideoDia
             onChange: handleResolutionChange,
             error: !!errors.resolution,
             helperText: errors.resolution || "(leave blank for original, will fail if target > original)",
-            inputProps: {inputMode: 'numeric', pattern: '[0-9]*', min: '144'}
+            InputProps: {
+                inputProps: {
+                    inputMode: 'numeric',
+                    pattern: '[0-9]*',
+                    min: '144'
+                }
+            }
         }
     };
 

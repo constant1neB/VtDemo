@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, {useEffect, useState} from "react";
 import axios from 'axios';
-import { useNavigate } from 'react-router-dom';
+import {useNavigate, useSearchParams} from 'react-router-dom';
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Stack from "@mui/material/Stack";
@@ -21,9 +21,27 @@ function Login() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
   const [snackbarMessage, setSnackbarMessage] = useState<string>("");
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const navigate = useNavigate(); // Hook for navigation
-  const auth = useAuth(); // Get auth context methods
+
+  const navigate = useNavigate();
+  const auth = useAuth();
+
+    useEffect(() => {
+        const verified = searchParams.get('verified');
+        const error = searchParams.get('error');
+
+        if (verified === 'true') {
+            setSnackbarMessage("Email successfully verified! You can now log in.");
+            setSnackbarOpen(true);
+            navigate('/login', { replace: true });
+        } else if (error === 'verification_failed') {
+            setSnackbarMessage("Verification failed: Invalid or expired token. Please try again or resend verification.");
+            setSnackbarOpen(true);
+            navigate('/login', { replace: true });
+        }
+        setSearchParams({}, { replace: true });
+    }, [searchParams, navigate, setSearchParams]);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     setUser({ ...user, [event.target.name]: event.target.value });
@@ -113,10 +131,10 @@ function Login() {
 
         <Snackbar
             open={snackbarOpen}
-            autoHideDuration={6000} // Longer duration for errors
+            autoHideDuration={6000}
             onClose={() => setSnackbarOpen(false)}
             message={snackbarMessage}
-            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} // Center snackbar
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
         />
       </Stack>
   );
