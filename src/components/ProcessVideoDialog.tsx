@@ -229,7 +229,6 @@ function ProcessVideoDialog({open, handleClose, video}: Readonly<ProcessVideoDia
             value: options.cutStartTime ?? '',
             onChange: handleStartTimeChange,
             error: !!errors.startTime,
-            helperText: errors.startTime || "(leave blank for no cut)",
             inputProps: {inputMode: 'decimal', step: '0.1'}
         },
         endTime: {
@@ -247,7 +246,7 @@ function ProcessVideoDialog({open, handleClose, video}: Readonly<ProcessVideoDia
             value: options.targetResolutionHeight ?? '',
             onChange: handleResolutionChange,
             error: !!errors.resolution,
-            helperText: errors.resolution || "(leave blank for original)",
+            helperText: errors.resolution || "(leave blank for original, will fail if target > original)",
             inputProps: {inputMode: 'numeric', pattern: '[0-9]*', min: '144'}
         }
     };
