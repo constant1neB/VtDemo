@@ -24,14 +24,13 @@ function EditVideoDescriptionDialog({ open, handleClose, video }: Readonly<EditV
     const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
     const [snackbarMessage, setSnackbarMessage] = useState<string>("");
 
-    // Update local state when the video prop changes (dialog opens)
     useEffect(() => {
         if (video) {
-            setDescription(video.description ?? ''); // Set initial description
+            setDescription(video.description ?? '');
         } else {
-            setDescription(''); // Reset if no video
+            setDescription('');
         }
-    }, [video, open]); // Depend on video and open state
+    }, [video, open]);
 
     const { mutate: updateMutate, isPending: isUpdating } = useMutation<
         VideoResponse,
@@ -44,13 +43,10 @@ function EditVideoDescriptionDialog({ open, handleClose, video }: Readonly<EditV
             setSnackbarOpen(true);
 
             try {
-                // Await the invalidation to ensure it completes
                 await queryClient.invalidateQueries({
                     queryKey: ['videos'],
-                    refetchType: 'active', // Only refetch active queries
+                    refetchType: 'active',
                 });
-                // Optionally update single item cache if needed:
-                // queryClient.setQueryData(['videos', updatedVideo.id], updatedVideo);
             } catch (error) {
                 console.error('Error invalidating queries:', error);
                 setSnackbarMessage('Description updated but failed to refresh the list');
