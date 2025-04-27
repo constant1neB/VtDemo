@@ -14,7 +14,7 @@ import {
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import Box from "@mui/material/Box";
-import {CircularProgress, Dialog, DialogContent, IconButton, Snackbar, Tooltip, Typography} from "@mui/material";
+import {CircularProgress, Dialog, IconButton, Snackbar, Tooltip, Typography} from "@mui/material";
 import PlayCircleIcon from '@mui/icons-material/PlayCircle';
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
@@ -92,7 +92,7 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
             const isAnyProcessing = data?.some(v => v.status === VideoStatus.PROCESSING) ?? false;
             if (isAnyProcessing) {
                 console.log("Polling video status (processing detected)...");
-                return 5000;
+                return 2000;
             }
             return false;
         },
@@ -430,7 +430,6 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
                 />
             </Box>
 
-            {/* Dialogs and Snackbar (remain the same) */}
             <UploadVideo open={isUploadDialogOpen} handleClose={() => setIsUploadDialogOpen(false)}/>
             {currentVideoToEdit &&
                 <EditVideoDescriptionDialog open={isEditDialogOpen} handleClose={handleCloseEditDialog}
@@ -440,23 +439,129 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
                                     video={currentVideoToProcess}/>}
             <Snackbar open={snackbarOpen} autoHideDuration={4000} onClose={() => setSnackbarOpen(false)}
                       message={snackbarMessage} anchorOrigin={{vertical: 'bottom', horizontal: 'center'}}/>
-            <Dialog open={isPlayerOpen} onClose={handleClosePlayer} sx={{}}>
-                <DialogContent sx={{p: 0, overflow: 'hidden', lineHeight: 0}}>
-                    <IconButton aria-label="close video player" onClick={handleClosePlayer}
-                                sx={{}}><CloseIcon/></IconButton>
-                    {videoUrl ? (<video key={videoUrl} src={videoUrl} controls style={{}} onError={() => {
-                    }}/>) : (
+            <Dialog
+                open={isPlayerOpen}
+                onClose={handleClosePlayer}
+                maxWidth={false}
+                transitionDuration={0}
+                hideBackdrop={true}
+                disablePortal={true}
+                disableScrollLock={true}
+                slotProps={{
+                    paper: {
+                        style: {
+                            backgroundColor: '#000',
+                            borderRadius: '4px',
+                            overflow: 'hidden',
+                            margin: 0,
+                            padding: 0,
+                            transition: 'none'
+                        }
+                    },
+                    backdrop: {
+                        style: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                            transition: 'none'
+                        }
+                    },
+                    transition: {
+                        appear: false,
+                        timeout: 0
+                    }
+                }}
+                style={{ transition: 'none' }}
+            >
+                <Box sx={{ position: 'relative', transition: 'none' }}>
+                    <IconButton
+                        aria-label="close video player"
+                        onClick={handleClosePlayer}
+                        sx={{
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
+                            zIndex: 1,
+                            color: 'white',
+                            backgroundColor: 'rgba(0,0,0,0.5)',
+                            transition: 'none',
+                            '&:hover': {
+                                backgroundColor: 'rgba(0,0,0,0.7)',
+                                transition: 'none'
+                            }
+                        }}
+                    >
+                        <CloseIcon />
+                    </IconButton>
+
+                    {videoUrl ? (
+                        <Box
+                            sx={{
+                                position: 'relative',
+                                transition: 'none',
+                                '&:focus': { outline: 'none' } // Remove outline when focused
+                            }}
+                        >
+                            <video
+                                key={videoUrl}
+                                src={videoUrl}
+                                controls
+                                autoPlay
+                                playsInline
+                                disablePictureInPicture
+                                controlsList="nodownload nofullscreen nopictureinpicture"
+                                style={{
+                                    display: 'block',
+                                    maxHeight: '90vh',
+                                    transition: 'none'
+                                }}
+                                onLoadedMetadata={(e) => {
+                                    // Set the dialog size based on video dimensions with no animation
+                                    const video = e.target as HTMLVideoElement;
+                                    const videoWidth = video.videoWidth;
+                                    const videoHeight = video.videoHeight;
+
+                                    // Adjust if video is too large for screen
+                                    const maxWidth = window.innerWidth * 0.9;
+                                    const maxHeight = window.innerHeight * 0.9;
+
+                                    let width = videoWidth;
+                                    let height = videoHeight;
+
+                                    if (width > maxWidth) {
+                                        const ratio = maxWidth / width;
+                                        width = maxWidth;
+                                        height = height * ratio;
+                                    }
+
+                                    if (height > maxHeight) {
+                                        const ratio = maxHeight / height;
+                                        height = maxHeight;
+                                        width = width * ratio;
+                                    }
+
+                                    video.style.width = `${width}px`;
+                                    video.style.height = `${height}px`;
+                                    video.style.transition = 'none';
+                                }}
+                                onError={() => {
+                                    setSnackbarMessage("Error loading video");
+                                    setSnackbarOpen(true);
+                                    handleClosePlayer();
+                                }}
+                            />
+                        </Box>
+                    ) : (
                         <Box sx={{
                             display: 'flex',
                             justifyContent: 'center',
                             alignItems: 'center',
                             width: '200px',
-                            height: '200px'
+                            height: '200px',
+                            transition: 'none'
                         }}>
-                            {isLoadingVideo && <CircularProgress sx={{color: 'white'}}/>}
+                            {isLoadingVideo && <CircularProgress sx={{ color: 'white', transition: 'none' }} />}
                         </Box>
                     )}
-                </DialogContent>
+                </Box>
             </Dialog>
         </Box>
     );
