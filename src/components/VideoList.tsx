@@ -1,21 +1,16 @@
-import React, { useState } from "react"; // Added React import
+import React, { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listVideos, deleteVideo, downloadVideo } from "../api/videoApi";
+import { listVideos, deleteVideo, downloadVideo, downloadOriginalVideo } from "../api/videoApi";
 import { formatFileSize, formatDuration, formatDate } from '../utils/formatters';
-import {
-    DataGrid,
-    GridColDef,
-    GridRenderCellParams,
-    GridToolbar,
-    GridValidRowModel
-} from "@mui/x-data-grid";
+import { DataGrid, GridColDef, GridRenderCellParams, GridToolbar, GridValidRowModel } from "@mui/x-data-grid";
 import Button from "@mui/material/Button";
 import Stack from "@mui/material/Stack";
 import Box from "@mui/material/Box";
-import { Snackbar, CircularProgress, Typography, IconButton } from "@mui/material";
+import { Snackbar, CircularProgress, Typography, IconButton, Tooltip } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
-import DownloadIcon from "@mui/icons-material/Download";
+import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
+import SourceIcon from '@mui/icons-material/Source';
 import PlayCircleOutlineIcon from '@mui/icons-material/PlayCircleOutline';
 import UploadVideo from "./UploadVideo";
 import EditVideoDescriptionDialog from "./EditVideoDescriptionDialog";
@@ -28,14 +23,43 @@ import { parseApiError } from '../utils/errorUtils';
 interface VideoRowModel extends GridValidRowModel, VideoResponse {}
 
 type VideoListProps = {
-    logOut: () => void; // Changed prop name to be more explicit
+    logOut: () => void;
 };
+
+// Helper function to get styling props based on video status
+const getStatusChipProps = (status: VideoStatus) => {
+    switch (status) {
+        case VideoStatus.READY:
+            return {
+                color: 'success.contrastText',
+                backgroundColor: 'success.main',
+            };
+        case VideoStatus.PROCESSING:
+            return {
+                color: 'info.contrastText',
+                backgroundColor: 'info.main',
+            };
+        case VideoStatus.FAILED:
+            return {
+                color: 'error.contrastText',
+                backgroundColor: 'error.main',
+            };
+        case VideoStatus.UPLOADED:
+        default:
+            return {
+                color: 'text.primary',
+                backgroundColor: 'action.disabledBackground', // Greyish default
+            };
+    }
+};
+
 
 const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState("");
     const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-    const [downloadingId, setDownloadingId] = useState<string | null>(null);
+    const [downloadingLatestId, setDownloadingLatestId] = useState<string | null>(null);
+    const [downloadingOriginalId, setDownloadingOriginalId] = useState<string | null>(null);
     const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
     const [currentVideoToEdit, setCurrentVideoToEdit] = useState<VideoResponse | null>(null);
     const [isProcessDialogOpen, setIsProcessDialogOpen] = useState(false);
@@ -43,11 +67,21 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
 
     const queryClient = useQueryClient();
 
-    // Fetch videos using React Query
-    const { data: videos, error, isLoading } = useQuery<VideoResponse[], Error>({
+    // Fetch videos using React Query with polling for processing status
+    const { data: videos, error, isLoading: isFetchingVideos } = useQuery<VideoResponse[], Error>({
         queryKey: ["videos"],
         queryFn: listVideos,
-        staleTime: 1000 * 60,
+        staleTime: 1000 * 30, // Data fresh for 30s
+        refetchInterval: (query) => {
+            const data = query.state.data;
+            const isAnyProcessing = data?.some(v => v.status === VideoStatus.PROCESSING) ?? false;
+            if (isAnyProcessing) {
+                console.log("Polling video status (processing detected)...");
+                return 5000; // Poll every 5 seconds
+            }
+            return false; // Stop polling
+        },
+        refetchIntervalInBackground: false, // Don't poll if tab inactive
         placeholderData: (previousData) => previousData,
     });
 
@@ -57,193 +91,185 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
         Error,
         string
     >({
-        mutationFn: async (publicId: string) => {
-            await deleteVideo(publicId); // Uses the configured apiClient
+        mutationFn: async (publicId: string): Promise<void> => {
+            await deleteVideo(publicId);
         },
-        onSuccess: () => {
-            setSnackbarMessage(`Video deleted successfully.`);
+        onSuccess: (_data, publicId) => { // _data is void here
+            setSnackbarMessage(`Video (ID: ${publicId.substring(0,8)}...) deleted.`);
             setSnackbarOpen(true);
             void queryClient.invalidateQueries({ queryKey: ["videos"] });
         },
-        onError: () => {
-            const message = parseApiError(`Failed to delete video.`);
+        onError: (error: Error, publicId) => {
+            const message = parseApiError(error, `Failed to delete video (ID: ${publicId.substring(0,8)}...).`);
             setSnackbarMessage(message);
             setSnackbarOpen(true);
         },
     });
 
-    // --- Action Handlers ---
+
+    const triggerBlobDownload = (response: AxiosResponse<Blob>, defaultFilename: string) => {
+        const url = window.URL.createObjectURL(response.data);
+        const link = document.createElement('a');
+        link.href = url;
+        const contentDisposition = response.headers['content-disposition'];
+        let downloadFilename = defaultFilename;
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename\*?=['"]?([^'";]+)['"]?/i);
+            if (filenameMatch?.[1]) {
+                try {
+                    downloadFilename = decodeURIComponent(filenameMatch[1]);
+                } catch (decodeError) {
+                    console.warn("Could not decode filename:", filenameMatch[1], decodeError);
+                    downloadFilename = filenameMatch[1];
+                }
+            }
+        }
+        link.setAttribute('download', downloadFilename);
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+            console.debug(`Revoked object URL for: ${downloadFilename}`);
+        }, 100);
+        setSnackbarMessage(`Download started: ${downloadFilename}`);
+        setSnackbarOpen(true);
+    }
+
     const handleEdit = (video: VideoResponse) => {
         setCurrentVideoToEdit(video);
         setIsEditDialogOpen(true);
     };
 
-    const handleDownload = async (publicId: string, status: VideoStatus) => {
+    const handleDownloadLatest = async (publicId: string, status: VideoStatus) => {
         if (status !== VideoStatus.READY && status !== VideoStatus.UPLOADED) {
-            setSnackbarMessage("Video is not ready or available for download.");
-            setSnackbarOpen(true);
-            return;
+            setSnackbarMessage("Latest version not ready/available for download.");
+            setSnackbarOpen(true); return;
         }
-        setSnackbarMessage(`Preparing download`);
-        setSnackbarOpen(true);
-
+        setDownloadingLatestId(publicId);
+        setSnackbarMessage(`Preparing latest download...`); setSnackbarOpen(true);
         try {
-            // Uses the configured apiClient
-            const response: AxiosResponse<Blob> = await downloadVideo(publicId);
-            const url = window.URL.createObjectURL(response.data);
-            const link = document.createElement('a');
-            link.href = url;
-
-            const contentDisposition = response.headers['content-disposition'];
-            let downloadFilename = `video-${publicId}.mp4`; // Default fallback
-
-            if (contentDisposition) {
-                const filenameMatch = contentDisposition.match(/filename\*?=['"]?([^'";]+)['"]?/i);
-                if (filenameMatch?.[1]) {
-                    try {
-                        downloadFilename = decodeURIComponent(filenameMatch[1]);
-                    } catch (decodeError) {
-                        console.warn("Could not decode filename from Content-Disposition:", filenameMatch[1], decodeError);
-                        downloadFilename = filenameMatch[1];
-                    }
-                }
-            }
-
-            link.setAttribute('download', downloadFilename);
-            document.body.appendChild(link);
-            link.click();
-
-            setTimeout(() => {
-                document.body.removeChild(link);
-                window.URL.revokeObjectURL(url);
-                console.debug(`Revoked object URL for video ID ${publicId}`);
-            }, 100);
-
-            setSnackbarMessage(`Download started`);
-            setSnackbarOpen(true);
-
+            const response = await downloadVideo(publicId);
+            triggerBlobDownload(response, `latest-${publicId.substring(0,8)}.mp4`);
         } catch (err: unknown) {
-            console.error(`Error downloading video ID ${publicId}:`, err);
-            const message = parseApiError(err, `Failed to download video`);
-            setSnackbarMessage(message);
-            setSnackbarOpen(true);
-        } finally {
-            setDownloadingId(null);
-        }
+            const message = parseApiError(err, `Failed to download latest video`);
+            setSnackbarMessage(message); setSnackbarOpen(true);
+        } finally { setDownloadingLatestId(null); }
+    };
+
+    const handleDownloadOriginal = async (publicId: string) => {
+        setDownloadingOriginalId(publicId);
+        setSnackbarMessage(`Preparing original download...`); setSnackbarOpen(true);
+        try {
+            const response = await downloadOriginalVideo(publicId);
+            triggerBlobDownload(response, `original-${publicId.substring(0,8)}.mp4`);
+        } catch (err: unknown) {
+            const message = parseApiError(err, `Failed to download original video`);
+            setSnackbarMessage(message); setSnackbarOpen(true);
+        } finally { setDownloadingOriginalId(null); }
     };
 
     const handleProcess = (video: VideoResponse) => {
-        if (video.status !== VideoStatus.READY && video.status !== VideoStatus.UPLOADED) {
+        if (video.status !== VideoStatus.UPLOADED && video.status !== VideoStatus.READY) {
             setSnackbarMessage("Video cannot be processed in its current state.");
-            setSnackbarOpen(true);
-            return;
+            setSnackbarOpen(true); return;
         }
         setCurrentVideoToProcess(video);
         setIsProcessDialogOpen(true);
     };
 
-    const handleDelete = (publicId: string) => {
-        if (window.confirm(`Are you sure you want to delete this video? This action cannot be undone.`)) {
+    const handleDeleteClick = (publicId: string) => {
+        if (window.confirm(`Delete video (ID: ${publicId.substring(0,8)}...)? Cannot be undone.`)) {
             deleteMutate(publicId);
         }
     };
 
-    const handleLogout = () => {
-        if (window.confirm("Are you sure you want to log out?")) {
-            logOut();
-        }
-    };
+    const handleLogout = () => { if (window.confirm("Log out?")) { logOut(); } };
 
-    // --- End Action Handlers ---
+    const handleCloseEditDialog = () => { setIsEditDialogOpen(false); setCurrentVideoToEdit(null); };
+    const handleCloseProcessDialog = () => { setIsProcessDialogOpen(false); setCurrentVideoToProcess(null); };
 
-    // --- Close Dialog Handlers ---
-    const handleCloseEditDialog = () => {
-        setIsEditDialogOpen(false);
-        setCurrentVideoToEdit(null);
-    };
-    const handleCloseProcessDialog = () => {
-        setIsProcessDialogOpen(false);
-        setCurrentVideoToProcess(null);
-    };
-    // --- End Close Dialog Handlers ---
-
-    // Define DataGrid Columns (same as before, just ensure types match VideoRowModel)
     const columns: GridColDef<VideoRowModel>[] = [
         {
-            field: "description",
-            headerName: "Description",
-            flex: 1,
-            minWidth: 250,
+            field: "publicId", headerName: "ID", width: 100,
+            renderCell: (params) => <Tooltip title={params.value}><Typography variant="caption">{params.value.substring(0, 8)}...</Typography></Tooltip>
+        },
+        { field: "description", headerName: "Description", flex: 1, minWidth: 250,
             valueGetter: (_value, row) => row.description ?? "---",
-            renderCell: (params: GridRenderCellParams<VideoRowModel, string>) => (
-                <Box sx={{ whiteSpace: 'normal', lineHeight: 'normal', py: 1 }}>
-                    {params.value}
-                </Box>
-            )
+            renderCell: (params) => <Box sx={{ whiteSpace: 'normal', lineHeight: 'normal', py: 1 }}>{params.value}</Box> },
+        { field: "fileSize", headerName: "Size", width: 110, valueFormatter: (v) => formatFileSize(v), align: 'right', headerAlign: 'right' },
+        { field: "duration", headerName: "Duration", width: 100, valueFormatter: (v) => formatDuration(v), align: 'right', headerAlign: 'right' },
+        { field: "uploadDate", headerName: "Uploaded", width: 180, valueGetter: (_v, row) => row.uploadDate, renderCell: (params) => formatDate(params.value) },
+        {
+            field: "status",
+            headerName: "Status",
+            width: 120,
+            align: 'center',
+            headerAlign: 'center',
+            renderCell: (params: GridRenderCellParams<VideoRowModel>) => {
+                const chipProps = getStatusChipProps(params.row.status);
+                return (
+                    <Typography variant="caption" sx={{
+                        fontWeight: 'bold',
+                        px: 1, py: 0.5, borderRadius: '4px',
+                        color: chipProps.color,
+                        backgroundColor: chipProps.backgroundColor,
+                    }}>
+                        {params.row.status}
+                    </Typography>
+                );
+            }
         },
         {
-            field: "fileSize",
-            headerName: "Size",
-            width: 110,
-            valueFormatter: (value: number | null | undefined) => formatFileSize(value),
-        },
-        {
-            field: "duration",
-            headerName: "Duration",
-            width: 100,
-            valueFormatter: (value: number | null | undefined) => formatDuration(value),
-        },
-        {
-            field: "uploadDate",
-            headerName: "Uploaded",
-            width: 180,
-            valueGetter: (_value, row) => row.uploadDate,
-            renderCell: (params: GridRenderCellParams<VideoRowModel, string | null | undefined>) => formatDate(params.value)
-        },
-        {
-            field: "actions",
-            headerName: "Actions",
-            width: 180,
-            sortable: false,
-            filterable: false,
-            disableColumnMenu: true,
+            field: "actions", headerName: "Actions", width: 220, sortable: false, filterable: false, disableColumnMenu: true, align: 'center', headerAlign: 'center',
             renderCell: (params: GridRenderCellParams<VideoRowModel>) => {
                 const video = params.row;
-                const isCurrentDownloading = downloadingId === video.publicId;
-                const canDownload = video.status === VideoStatus.READY || video.status === VideoStatus.UPLOADED;
+                const isDownloadingLatest = downloadingLatestId === video.publicId;
+                const isDownloadingOriginal = downloadingOriginalId === video.publicId;
+                const isAnyDownloadingForRow = isDownloadingLatest || isDownloadingOriginal;
+                const isProcessing = video.status === VideoStatus.PROCESSING;
+                const isActionDisabled = isDeleting || isAnyDownloadingForRow || isProcessing;
+
+                const canDownloadLatest = video.status === VideoStatus.READY || video.status === VideoStatus.UPLOADED;
                 const canProcess = video.status === VideoStatus.UPLOADED || video.status === VideoStatus.READY;
-                const isActionDisabled = isDeleting || isCurrentDownloading;
 
                 return (
-                    <Stack direction="row" spacing={0.5}>
-                        <IconButton
-                            aria-label="edit description" size="small" title="Edit Description"
-                            onClick={() => handleEdit(video)}
-                            disabled={isActionDisabled}
-                        >
-                            <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                            aria-label="download video" size="small" title="Download Video"
-                            disabled={isActionDisabled || !canDownload}
-                            onClick={() => handleDownload(video.publicId, video.status)}
-                        >
-                            {isCurrentDownloading ? <CircularProgress size={20} /> : <DownloadIcon fontSize="small" />}
-                        </IconButton>
-                        <IconButton
-                            aria-label="process video" size="small" title="Process/Edit Video"
-                            disabled={isActionDisabled || !canProcess}
-                            onClick={() => handleProcess(video)}
-                        >
-                            <PlayCircleOutlineIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                            aria-label="delete video" size="small" title="Delete Video"
-                            onClick={() => handleDelete(video.publicId)}
-                            disabled={isActionDisabled}
-                        >
-                            <DeleteIcon fontSize="small" />
-                        </IconButton>
+                    <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Tooltip title="Edit Description">
+                            <span>
+                                <IconButton aria-label="edit description" size="small" onClick={() => handleEdit(video)} disabled={isActionDisabled || isDeleting}>
+                                    <EditIcon fontSize="inherit" />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Tooltip title="Download Latest">
+                            <span>
+                                <IconButton aria-label="download latest video" size="small" onClick={() => handleDownloadLatest(video.publicId, video.status)} disabled={isActionDisabled || !canDownloadLatest || isDeleting}>
+                                    {isDownloadingLatest ? <CircularProgress size={20} /> : <CloudDownloadIcon fontSize="inherit" />}
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Tooltip title="Download Original">
+                             <span>
+                                <IconButton aria-label="download original video" size="small" onClick={() => handleDownloadOriginal(video.publicId)} disabled={isActionDisabled || isDeleting}>
+                                    {isDownloadingOriginal ? <CircularProgress size={20} /> : <SourceIcon fontSize="inherit" />}
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Tooltip title="Process/Edit Video">
+                            <span>
+                                <IconButton aria-label="process video" size="small" onClick={() => handleProcess(video)} disabled={isActionDisabled || !canProcess || isDeleting}>
+                                    <PlayCircleOutlineIcon fontSize="inherit" />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Tooltip title="Delete Video">
+                            <span>
+                                <IconButton aria-label="delete video" size="small" onClick={() => handleDeleteClick(video.publicId)} disabled={isActionDisabled || isDeleting} color="error">
+                                    <DeleteIcon fontSize="inherit" />
+                                </IconButton>
+                            </span>
+                        </Tooltip>
                     </Stack>
                 );
             }
@@ -251,101 +277,51 @@ const VideoList: React.FC<VideoListProps> = ({ logOut }) => {
     ];
 
     // --- Render Logic ---
-    if (isLoading && !videos) {
+    if (isFetchingVideos && !videos) { // Initial load
         return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}><CircularProgress /></Box>;
     }
-    if (error) {
+    if (error) { // Fetching error
         return <Typography color="error" sx={{ mt: 4 }}>Error fetching videos: {error.message}</Typography>;
     }
-    if (!videos) {
-        return <Typography sx={{ mt: 4 }}>No videos found or could not load data.</Typography>;
-    }
+    const videoData = videos ?? []; // Ensure we have an array
+    const isGridLoading = isFetchingVideos || isDeleting || !!downloadingLatestId || !!downloadingOriginalId; // Grid overlay loading state
 
     return (
-        <Box sx={{
-            display: 'flex',
-            flexDirection: 'column',
-            height: 'calc(100vh - 150px)', // Adjust height as needed
-            width: '100%'
-        }}>
-            <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                sx={{ mb: 2, px: 1 }}
-            >
-                <Button
-                    variant="contained"
-                    onClick={() => setIsUploadDialogOpen(true)}
-                    disabled={isDeleting || !!downloadingId}
-                >
-                    Upload New Video
-                </Button>
-                <Button
-                    variant="outlined"
-                    onClick={handleLogout}
-                    disabled={isDeleting || !!downloadingId}
-                >
-                    Log out
-                </Button>
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 150px)', width: '100%' }}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2, px: 1 }}>
+                <Button variant="contained" onClick={() => setIsUploadDialogOpen(true)} disabled={isGridLoading}>Upload New Video</Button>
+                <Button variant="outlined" onClick={handleLogout} disabled={isGridLoading}>Log out</Button>
             </Stack>
-
-            <Box sx={{ flex: 1 }}>
+            <Box sx={{ flexGrow: 1, width: '100%' }}>
                 <DataGrid
-                    rows={videos}
+                    rows={videoData}
                     columns={columns}
                     getRowId={(row) => row.publicId}
-                    disableRowSelectionOnClick={true}
+                    disableRowSelectionOnClick
                     slots={{ toolbar: GridToolbar }}
                     initialState={{
-                        pagination: {
-                            paginationModel: { pageSize: 10, page: 0 },
-                        },
-                        sorting: {
-                            sortModel: [{ field: 'uploadDate', sort: 'desc' }],
-                        },
+                        pagination: { paginationModel: { pageSize: 10, page: 0 } },
+                        sorting: { sortModel: [{ field: 'uploadDate', sort: 'desc' }] },
+                        columns: { columnVisibilityModel: { publicId: false } } // Hide ID column by default
                     }}
                     pageSizeOptions={[10, 25, 50]}
                     rowHeight={70}
+                    loading={isGridLoading}
                     sx={{
                         border: 0,
-                        '& .MuiDataGrid-columnHeaderTitleContainer': { justifyContent: 'flex-start' },
-                        '& .MuiDataGrid-columnHeaderTitle': { overflow: 'visible', lineHeight: 'normal', whiteSpace: 'normal', fontWeight: 'bold' },
+                        '& .MuiDataGrid-columnHeaderTitle': { fontWeight: 'bold' },
                         '& .MuiDataGrid-cell': { whiteSpace: 'normal !important', wordWrap: 'break-word !important', lineHeight: '1.4 !important', alignItems: 'center', py: 1 },
                         '& .MuiDataGrid-cell[data-field="description"]': { alignItems: 'flex-start' },
+                        '& .MuiDataGrid-actionsCell': { justifyContent: 'center' }
                     }}
-                    loading={isLoading || isDeleting || !!downloadingId}
                 />
             </Box>
-
             {/* Dialogs */}
-            <UploadVideo
-                open={isUploadDialogOpen}
-                handleClose={() => setIsUploadDialogOpen(false)}
-            />
-            {currentVideoToEdit && (
-                <EditVideoDescriptionDialog
-                    open={isEditDialogOpen}
-                    handleClose={handleCloseEditDialog}
-                    video={currentVideoToEdit}
-                />
-            )}
-            {currentVideoToProcess && (
-                <ProcessVideoDialog
-                    open={isProcessDialogOpen}
-                    handleClose={handleCloseProcessDialog}
-                    video={currentVideoToProcess}
-                />
-            )}
-
+            <UploadVideo open={isUploadDialogOpen} handleClose={() => setIsUploadDialogOpen(false)} />
+            {currentVideoToEdit && <EditVideoDescriptionDialog open={isEditDialogOpen} handleClose={handleCloseEditDialog} video={currentVideoToEdit} />}
+            {currentVideoToProcess && <ProcessVideoDialog open={isProcessDialogOpen} handleClose={handleCloseProcessDialog} video={currentVideoToProcess} />}
             {/* Snackbar */}
-            <Snackbar
-                open={snackbarOpen}
-                autoHideDuration={4000}
-                onClose={() => setSnackbarOpen(false)}
-                message={snackbarMessage}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-            />
+            <Snackbar open={snackbarOpen} autoHideDuration={4000} onClose={() => setSnackbarOpen(false)} message={snackbarMessage} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }} />
         </Box>
     );
 }

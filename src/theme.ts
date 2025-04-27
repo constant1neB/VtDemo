@@ -4,7 +4,7 @@ import "@mui/x-data-grid/themeAugmentation";
 const neonLime = "#39FF14";
 const darkCharcoal = "#1A1A1A";
 const paperDark = "#242424";
-const royalPurple = "#7851a9";
+const royalPurple = "#4a2e78";
 
 const theme = extendTheme({
   cssVarPrefix: "mui",
@@ -35,7 +35,7 @@ const theme = extendTheme({
   components: {
     MuiDataGrid: {
       styleOverrides: {
-        root: {}, // Keep empty or add specific styles
+        root: {},
       },
     },
     MuiDialogActions: {
@@ -46,7 +46,7 @@ const theme = extendTheme({
       },
     },
   },
-  colorSchemeSelector: '[data-mui-color-scheme="%s"]', // Instructs to use data attribute
+  colorSchemeSelector: '[data-mui-color-scheme="%s"]',
 });
 
 export default theme;
