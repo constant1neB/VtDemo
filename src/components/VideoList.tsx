@@ -272,7 +272,7 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
                         <span>
                             <IconButton aria-label="play original video" size="medium"
                                         onClick={() => handlePlayOriginalClick(params.row.publicId)}
-                                        disabled={isLoadingThisVideo || isDeleting}>
+                                        disabled={!(!isLoadingThisVideo && !isDeleting)}>
                                 {isLoadingThisVideo ? <CircularProgress size={24}/> : <PlayCircleIcon/>}
                             </IconButton>
                         </span>
@@ -347,26 +347,26 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
                     <Stack direction="row" spacing={0.5} alignItems="center">
                         <Tooltip title="Edit Description"><span><IconButton aria-label="edit description" size="medium"
                                                                             onClick={() => handleEdit(video)}
-                                                                            disabled={isActionDisabled || isDeleting}><EditIcon
+                                                                            disabled={!(!isActionDisabled && !isDeleting)}><EditIcon
                             fontSize="inherit"/></IconButton></span></Tooltip>
                         <Tooltip title="Download Latest"><span><IconButton aria-label="download latest video"
                                                                            size="medium"
                                                                            onClick={() => handleDownloadLatest(video.publicId, video.status)}
-                                                                           disabled={isActionDisabled || !canDownloadLatest || isDeleting}>{isDownloadingLatest ?
+                                                                           disabled={!(!isActionDisabled && canDownloadLatest && !isDeleting)}>{isDownloadingLatest ?
                             <CircularProgress size={20}/> :
                             <DownloadIcon fontSize="inherit"/>}</IconButton></span></Tooltip>
                         <Tooltip title="Download Original"><span><IconButton aria-label="download original video"
                                                                              size="medium"
                                                                              onClick={() => handleDownloadOriginal(video.publicId)}
-                                                                             disabled={isActionDisabled || isDeleting}>{isDownloadingOriginal ?
+                                                                             disabled={!(!isActionDisabled && !isDeleting)}>{isDownloadingOriginal ?
                             <CircularProgress size={20}/> : <CloudDownloadIcon fontSize="inherit"/>}</IconButton></span></Tooltip>
                         <Tooltip title="Edit Video"><span><IconButton aria-label="process video" size="medium"
                                                                       onClick={() => handleProcess(video)}
-                                                                      disabled={isActionDisabled || !canProcess || isDeleting}><VideoSettingsIcon
+                                                                      disabled={!(!isActionDisabled && canProcess && !isDeleting)}><VideoSettingsIcon
                             fontSize="inherit"/></IconButton></span></Tooltip>
                         <Tooltip title="Delete Video"><span><IconButton aria-label="delete video" size="medium"
                                                                         onClick={() => handleDeleteClick(video.publicId)}
-                                                                        disabled={isActionDisabled || isDeleting}><DeleteIcon
+                                                                        disabled={!(!isActionDisabled && !isDeleting)}><DeleteIcon
                             fontSize="inherit"/></IconButton></span></Tooltip>
                     </Stack>
                 );
@@ -383,7 +383,7 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
         return <Typography color="error" sx={{mt: 4}}>Error fetching videos: {error.message}</Typography>;
     }
 
-    const isGridLoading = isFetchingVideos || isDeleting || !!downloadingLatestId || !!downloadingOriginalId;
+    const isGridLoading = !(!isFetchingVideos && !isDeleting && !downloadingLatestId && !downloadingOriginalId);
 
     return (
         <Box sx={{display: 'flex', flexDirection: 'column', height: 'calc(100vh - 150px)', width: '100%'}}>
