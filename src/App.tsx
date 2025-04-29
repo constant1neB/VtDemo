@@ -1,78 +1,110 @@
-// src/App.tsx
-import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
+import { Routes, Route, Navigate, Link as RouterLink, useLocation } from 'react-router-dom';
 import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import Container from '@mui/material/Container';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Stack from '@mui/material/Stack';
 
 import Login from './components/Login';
 import Register from './components/Register';
 import ResendVerification from './components/ResendVerification';
-import VideoList from './components/VideoList'; // Assuming VideoList is the main authenticated view
+import VideoList from './components/VideoList';
+import VideoPlayer from './components/VideoPlayer';
 import ThemeToggleButton from './components/ThemeToggleButton';
 import { useAuth } from './hooks/useAuth';
 import { useEffect } from 'react';
 import { initializeApiClient } from './api/videoApi';
+import { VideoPlayerProvider, useVideoPlayer } from './context/VideoPlayerContext';
 
-// Component to handle protected routes
-function ProtectedRoute() {
-    const { isAuthenticated } = useAuth();
-    console.log("ProtectedRoute check: isAuthenticated =", isAuthenticated); // Debug log
-    return isAuthenticated ? <Outlet /> : <Navigate to="/login" replace />;
-}
 
-// Component to handle routes accessible only when logged out
-function PublicOnlyRoute() {
-    const { isAuthenticated } = useAuth();
-    console.log("PublicOnlyRoute check: isAuthenticated =", isAuthenticated); // Debug log
-    return !isAuthenticated ? <Outlet /> : <Navigate to="/" replace />;
+function AppContent() {
+    const { logout: authLogout, isAuthenticated } = useAuth();
+    const { clearPlayerVideo } = useVideoPlayer();
+    const location = useLocation();
+
+    const handleLogout = () => {
+        if (window.confirm("Are you sure you want to log out?")) {
+            console.log("App.tsx: Coordinating logout...");
+            clearPlayerVideo();
+            authLogout();
+        }
+    };
+
+    return (
+        <>
+            <AppBar position="static">
+                <Toolbar>
+                    <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+                        <RouterLink to={isAuthenticated ? "/" : "/login"} style={{ textDecoration: 'none', color: 'inherit' }}>
+                            Video Platform
+                        </RouterLink>
+                    </Typography>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        {isAuthenticated && (
+                            <>
+                                <Button color="inherit" component={RouterLink} to="/archive">
+                                    Archive
+                                </Button>
+                                {/* Use the coordinated handleLogout */}
+                                <Button color="inherit" onClick={handleLogout}>
+                                    Log out
+                                </Button>
+                            </>
+                        )}
+                        <ThemeToggleButton />
+                    </Stack>
+                </Toolbar>
+            </AppBar>
+
+            <Box component="main" sx={{
+                flexGrow: 1, display: 'flex', flexDirection: 'column',
+                width: '100%', mt: 0, minHeight: 0, p: { xs: 1, sm: 2, md: 3 },
+            }}>
+                <Routes>
+                    {isAuthenticated ? (
+                        // --- Authenticated Routes ---
+                        <>
+                            <Route path="/" element={<VideoPlayer />} />
+                            <Route path="/archive" element={<VideoList logOut={handleLogout} />} />
+                            <Route path="/login" element={<Navigate to="/" replace />} />
+                            <Route path="/register" element={<Navigate to="/" replace />} />
+                            <Route path="/resend-verification" element={<Navigate to="/" replace />} />
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </>
+                    ) : (
+                        // --- Public Routes ---
+                        <>
+                            <Route path="/login" element={<Login />} />
+                            <Route path="/register" element={<Register />} />
+                            <Route path="/resend-verification" element={<ResendVerification />} />
+                            <Route path="*" element={<Navigate to="/login" replace state={{ from: location }} />} />
+                        </>
+                    )}
+                </Routes>
+            </Box>
+        </>
+    );
 }
 
 
 function App() {
-    const { token, logout } = useAuth(); // Get token and logout
+    const { token, logout: authLogout } = useAuth(); // Get token and original auth logout
 
-    // Initialize the API client when the component mounts or auth state changes
     useEffect(() => {
-        // Pass functions to get token and perform logout
-        initializeApiClient(() => token, logout);
+        // Pass the original auth logout to the initializer
+        initializeApiClient(() => token, authLogout);
         console.log("API Client Initialized/Re-initialized.");
-    }, [token, logout]);
+    }, [token, authLogout]);
+
 
     return (
-        <Container maxWidth="xl" sx={{ pt: 2 }}>
-            <AppBar position="static">
-                <Toolbar>
-                    <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                        Video Platform
-                    </Typography>
-                    <ThemeToggleButton />
-                </Toolbar>
-            </AppBar>
-            <Box component="main" sx={{ mt: 4 }}>
-                <Routes>
-                    {/* Routes accessible only when logged OUT */}
-                    <Route element={<PublicOnlyRoute />}>
-                        <Route path="/login" element={<Login />} />
-                        <Route path="/register" element={<Register />} />
-                        <Route path="/resend-verification" element={<ResendVerification />} />
-                    </Route>
-
-                    {/* Routes accessible only when logged IN */}
-                    <Route element={<ProtectedRoute />}>
-                        {/* Pass logout function to VideoList */}
-                        <Route path="/" element={<VideoList logOut={logout} />} />
-                        {/* Add other protected routes here */}
-                    </Route>
-
-                    {/* Redirect root based on auth state (handled by Protected/Public routes now) */}
-                    {/* Fallback for unmatched routes (optional) */}
-                    <Route path="*" element={<Navigate to="/" replace />} />
-
-                </Routes>
-            </Box>
-        </Container>
+        <VideoPlayerProvider>
+            <Container maxWidth="xl" disableGutters sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+                <AppContent />
+            </Container>
+        </VideoPlayerProvider>
     );
 }
 
