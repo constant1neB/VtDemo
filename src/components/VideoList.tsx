@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from "react";
 import {useMutation, useQuery, useQueryClient} from "@tanstack/react-query";
-import {deleteVideo, downloadOriginalVideo, downloadVideo, listVideos} from "../api/videoApi";
+import {deleteVideo, downloadOriginalVideo, downloadVideo, listVideos, updateVideoDescription} from "../api/videoApi";
 import {formatDate, formatFileSize} from '../utils/formatters';
 import {
     DataGrid,
@@ -23,19 +23,13 @@ import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import VideoSettingsIcon from '@mui/icons-material/VideoSettings';
 import CloseIcon from '@mui/icons-material/Close';
 import UploadVideo from "./UploadVideo";
-import EditVideoDescriptionDialog from "./EditVideoDescriptionDialog";
 import ProcessVideoDialog from "./ProcessVideoDialog";
-import {PaginatedVideoResponse, VideoResponse, VideoStatus} from "../types";
+import {PaginatedVideoResponse, UpdateVideoRequest, VideoResponse, VideoStatus} from "../types";
 import {AxiosResponse} from "axios";
 import {parseApiError} from '../utils/errorUtils';
 
-
 interface VideoRowModel extends GridValidRowModel, VideoResponse {
 }
-
-type VideoListProps = {
-    logOut: () => void;
-};
 
 const getStatusChipProps = (status: VideoStatus) => {
     switch (status) {
@@ -51,15 +45,12 @@ const getStatusChipProps = (status: VideoStatus) => {
     }
 };
 
-
-const VideoList: React.FC<VideoListProps> = ({logOut}) => {
+const VideoList: React.FC = () => {
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState("");
     const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-    const [downloadingLatestId, setDownloadingLatestId] = useState<string | null>(null);
+    const [downloadingLatestId, setDownloadingLatestId] = useState<string | null>(null); // Keep setter
     const [downloadingOriginalId, setDownloadingOriginalId] = useState<string | null>(null);
-    const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-    const [currentVideoToEdit, setCurrentVideoToEdit] = useState<VideoResponse | null>(null);
     const [isProcessDialogOpen, setIsProcessDialogOpen] = useState(false);
     const [currentVideoToProcess, setCurrentVideoToProcess] = useState<VideoResponse | null>(null);
     const [isPlayerOpen, setIsPlayerOpen] = useState(false);
@@ -104,6 +95,23 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
         setQueryOptions({paginationModel, sortModel});
     }, [paginationModel, sortModel]);
 
+    const {mutate: updateDescriptionMutate, isPending: isUpdatingDescription} = useMutation<
+        VideoResponse,
+        Error,
+        { publicId: string; data: UpdateVideoRequest }
+    >({
+        mutationFn: (vars) => updateVideoDescription(vars.publicId, vars.data),
+        onSuccess: (updatedVideo) => {
+            setSnackbarMessage(`Description updated for video ${updatedVideo.publicId.substring(0, 8)}...`);
+            setSnackbarOpen(true);
+            void queryClient.invalidateQueries({queryKey: ["videos"]});
+        },
+        onError: (error: Error, vars) => {
+            const message = parseApiError(error, `Failed to update description for video ${vars.publicId.substring(0, 8)}...`);
+            setSnackbarMessage(message);
+            setSnackbarOpen(true);
+        },
+    });
 
     const {mutate: deleteMutate, isPending: isDeleting} = useMutation<
         void,
@@ -153,10 +161,7 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
         setSnackbarMessage(`Download started: ${downloadFilename}`);
         setSnackbarOpen(true);
     };
-    const handleEdit = (video: VideoResponse) => {
-        setCurrentVideoToEdit(video);
-        setIsEditDialogOpen(true);
-    };
+
     const handleDownloadLatest = async (publicId: string, status: VideoStatus) => {
         if (status !== VideoStatus.READY && status !== VideoStatus.UPLOADED) {
             setSnackbarMessage("Latest version not ready/available for download.");
@@ -167,7 +172,7 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
         setSnackbarMessage(`Preparing latest download...`);
         setSnackbarOpen(true);
         try {
-            const response = await downloadVideo(publicId);
+            const response = await downloadVideo(publicId); // Use the imported API function
             triggerBlobDownload(response, `latest-${publicId.substring(0, 8)}.mp4`);
         } catch (err: unknown) {
             const message = parseApiError(err, `Failed to download latest video`);
@@ -177,20 +182,32 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
             setDownloadingLatestId(null);
         }
     };
+
+    const handleEdit = (video: VideoResponse) => {
+        if (!video) return;
+        const currentDescription = video.description ?? "";
+        const newDescription = window.prompt(
+            `Enter new description for video (ID: ${video.publicId.substring(0, 8)}...):`,
+            currentDescription
+        );
+        if (newDescription === null || newDescription === currentDescription) {
+            console.log("Description edit cancelled or unchanged.");
+            return;
+        }
+        updateDescriptionMutate({publicId: video.publicId, data: {description: newDescription}});
+    };
+
     const handlePlayOriginalClick = async (publicId: string) => {
         if (isLoadingVideo) return;
         setPlayingVideoId(publicId);
         setIsLoadingVideo(true);
         setVideoUrl(null);
         setIsPlayerOpen(false);
-
         try {
             const response = await downloadOriginalVideo(publicId);
-
             const url = URL.createObjectURL(response.data);
             setVideoUrl(url);
             setIsPlayerOpen(true);
-
         } catch (err: unknown) {
             const message = parseApiError(err, `Failed to load original video`);
             setSnackbarMessage(message);
@@ -200,6 +217,7 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
             setPlayingVideoId(null);
         }
     };
+
     const handleClosePlayer = () => {
         setIsPlayerOpen(false);
         if (videoUrl) {
@@ -208,6 +226,7 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
         }
         setVideoUrl(null);
     };
+
     const handleDownloadOriginal = async (publicId: string) => {
         setDownloadingOriginalId(publicId);
         setSnackbarMessage(`Preparing original download...`);
@@ -223,24 +242,18 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
             setDownloadingOriginalId(null);
         }
     };
+
     const handleProcess = (video: VideoResponse) => {
         setCurrentVideoToProcess(video);
         setIsProcessDialogOpen(true);
     };
+
     const handleDeleteClick = (publicId: string) => {
         if (window.confirm(`Delete video (ID: ${publicId.substring(0, 8)}...)? Cannot be undone.`)) {
             deleteMutate(publicId);
         }
     };
-    const handleLogout = () => {
-        if (window.confirm("Log out?")) {
-            logOut();
-        }
-    };
-    const handleCloseEditDialog = () => {
-        setIsEditDialogOpen(false);
-        setCurrentVideoToEdit(null);
-    };
+
     const handleCloseProcessDialog = () => {
         setIsProcessDialogOpen(false);
         setCurrentVideoToProcess(null);
@@ -272,7 +285,7 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
                         <span>
                             <IconButton aria-label="play original video" size="medium"
                                         onClick={() => handlePlayOriginalClick(params.row.publicId)}
-                                        disabled={!(!isLoadingThisVideo && !isDeleting)}>
+                                        disabled={isLoadingThisVideo || isDeleting}>
                                 {isLoadingThisVideo ? <CircularProgress size={24}/> : <PlayCircleIcon/>}
                             </IconButton>
                         </span>
@@ -287,6 +300,39 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
             minWidth: 250,
             valueGetter: (_value, row) => row.description ?? "---",
             renderCell: (params) => <Box sx={{whiteSpace: 'normal', lineHeight: 'normal', py: 1}}>{params.value}</Box>
+        },
+        {
+            field: "editDescription",
+            headerName: "Edit",
+            width: 60,
+            sortable: false,
+            filterable: false,
+            disableColumnMenu: true,
+            align: 'center',
+            headerAlign: 'center',
+            renderCell: (params: GridRenderCellParams<VideoRowModel>) => {
+                const video = params.row;
+                const isDownloadingLatest = downloadingLatestId === video.publicId;
+                const isDownloadingOriginal = downloadingOriginalId === video.publicId;
+                const isAnyDownloadingForRow = isDownloadingLatest || isDownloadingOriginal;
+                const isProcessing = video.status === VideoStatus.PROCESSING;
+                const isActionDisabled = isDeleting || isUpdatingDescription || isAnyDownloadingForRow || isProcessing;
+
+                return (
+                    <Tooltip title="Edit Description">
+                        <span> {/* Span for Tooltip when disabled */}
+                            <IconButton
+                                aria-label="edit description"
+                                size="medium"
+                                onClick={() => handleEdit(video)}
+                                disabled={isActionDisabled}
+                            >
+                               <EditIcon fontSize="inherit"/>
+                            </IconButton>
+                        </span>
+                    </Tooltip>
+                );
+            }
         },
         {
             field: "fileSize",
@@ -323,11 +369,10 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
                 );
             }
         },
-        // Actions Column
         {
             field: "actions",
             headerName: "Actions",
-            width: 220,
+            width: 190,
             sortable: false,
             filterable: false,
             disableColumnMenu: true,
@@ -339,35 +384,57 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
                 const isDownloadingOriginal = downloadingOriginalId === video.publicId;
                 const isAnyDownloadingForRow = isDownloadingLatest || isDownloadingOriginal;
                 const isProcessing = video.status === VideoStatus.PROCESSING;
-                const isActionDisabled = isDeleting || isAnyDownloadingForRow || isProcessing;
+                const isActionDisabled = isDeleting || isUpdatingDescription || isAnyDownloadingForRow || isProcessing;
+
                 const canDownloadLatest = video.status === VideoStatus.READY || video.status === VideoStatus.UPLOADED;
                 const canProcess = video.status === VideoStatus.UPLOADED || video.status === VideoStatus.READY || video.status === VideoStatus.FAILED;
 
                 return (
                     <Stack direction="row" spacing={0.5} alignItems="center">
-                        <Tooltip title="Edit Description"><span><IconButton aria-label="edit description" size="medium"
-                                                                            onClick={() => handleEdit(video)}
-                                                                            disabled={!(!isActionDisabled && !isDeleting)}><EditIcon
-                            fontSize="inherit"/></IconButton></span></Tooltip>
-                        <Tooltip title="Download Latest"><span><IconButton aria-label="download latest video"
-                                                                           size="medium"
-                                                                           onClick={() => handleDownloadLatest(video.publicId, video.status)}
-                                                                           disabled={!(!isActionDisabled && canDownloadLatest && !isDeleting)}>{isDownloadingLatest ?
-                            <CircularProgress size={20}/> :
-                            <DownloadIcon fontSize="inherit"/>}</IconButton></span></Tooltip>
-                        <Tooltip title="Download Original"><span><IconButton aria-label="download original video"
-                                                                             size="medium"
-                                                                             onClick={() => handleDownloadOriginal(video.publicId)}
-                                                                             disabled={!(!isActionDisabled && !isDeleting)}>{isDownloadingOriginal ?
-                            <CircularProgress size={20}/> : <CloudDownloadIcon fontSize="inherit"/>}</IconButton></span></Tooltip>
-                        <Tooltip title="Edit Video"><span><IconButton aria-label="process video" size="medium"
-                                                                      onClick={() => handleProcess(video)}
-                                                                      disabled={!(!isActionDisabled && canProcess && !isDeleting)}><VideoSettingsIcon
-                            fontSize="inherit"/></IconButton></span></Tooltip>
-                        <Tooltip title="Delete Video"><span><IconButton aria-label="delete video" size="medium"
-                                                                        onClick={() => handleDeleteClick(video.publicId)}
-                                                                        disabled={!(!isActionDisabled && !isDeleting)}><DeleteIcon
-                            fontSize="inherit"/></IconButton></span></Tooltip>
+                        <Tooltip title="Download Latest">
+                            <span>
+                                <IconButton aria-label="download latest video"
+                                            size="medium"
+                                            onClick={() => handleDownloadLatest(video.publicId, video.status)}
+                                            disabled={!(!isActionDisabled && canDownloadLatest)}>
+                                    {isDownloadingLatest ?
+                                        <CircularProgress size={20}/> :
+                                        <DownloadIcon fontSize="inherit"/>
+                                    }
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Tooltip title="Download Original">
+                            <span>
+                                <IconButton aria-label="download original video"
+                                            size="medium"
+                                            onClick={() => handleDownloadOriginal(video.publicId)}
+                                            disabled={isActionDisabled}> {/* Removed !isDeleting */}
+                                    {isDownloadingOriginal ? // Corrected variable
+                                        <CircularProgress size={20}/> :
+                                        <CloudDownloadIcon fontSize="inherit"/>
+                                    }
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Tooltip title="Edit Video">
+                            <span>
+                                <IconButton aria-label="process video" size="medium"
+                                            onClick={() => handleProcess(video)}
+                                            disabled={!(!isActionDisabled && canProcess)}>
+                                    <VideoSettingsIcon fontSize="inherit"/>
+                                </IconButton>
+                            </span>
+                        </Tooltip>
+                        <Tooltip title="Delete Video">
+                            <span>
+                                <IconButton aria-label="delete video" size="medium"
+                                            onClick={() => handleDeleteClick(video.publicId)}
+                                            disabled={isActionDisabled}>
+                                    <DeleteIcon fontSize="inherit"/>
+                                </IconButton>
+                            </span>
+                        </Tooltip>
                     </Stack>
                 );
             }
@@ -376,22 +443,23 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
 
     const rowCount = pageData?.totalElements ?? 0;
 
-    if (isFetchingVideos && !pageData) {
+    const isGridInitiallyLoading = isFetchingVideos && !pageData;
+    const isGridVisuallyLoading = isFetchingVideos || isDeleting;
+
+    if (isGridInitiallyLoading) {
         return <Box sx={{display: 'flex', justifyContent: 'center', mt: 4}}><CircularProgress/></Box>;
     }
     if (error) {
         return <Typography color="error" sx={{mt: 4}}>Error fetching videos: {error.message}</Typography>;
     }
 
-    const isGridLoading = !(!isFetchingVideos && !isDeleting && !downloadingLatestId && !downloadingOriginalId);
-
     return (
         <Box sx={{display: 'flex', flexDirection: 'column', height: 'calc(100vh - 150px)', width: '100%'}}>
-            {}
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{mb: 2, px: 1}}>
-                <Button variant="contained" onClick={() => setIsUploadDialogOpen(true)} disabled={isGridLoading}>Upload
-                    New Video</Button>
-                <Button variant="outlined" onClick={handleLogout} disabled={isGridLoading}>Log out</Button>
+                <Button variant="contained" onClick={() => setIsUploadDialogOpen(true)}
+                        disabled={isGridVisuallyLoading}>
+                    Upload New Video
+                </Button>
             </Stack>
 
             <Box sx={{flexGrow: 1, width: '100%'}}>
@@ -399,7 +467,7 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
                     rows={pageData?.content ?? []}
                     columns={columns}
                     getRowId={(row) => row.publicId}
-                    loading={isGridLoading}
+                    loading={isGridVisuallyLoading}
                     paginationMode="server"
                     rowCount={rowCount}
                     paginationModel={paginationModel}
@@ -410,6 +478,21 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
                     onSortModelChange={setSortModel}
                     disableRowSelectionOnClick
                     slots={{toolbar: GridToolbar}}
+                    slotProps={{
+                        toolbar: {
+                            showQuickFilter: true,
+                            sx: {
+                                display: 'flex',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                paddingTop: 1,
+                                paddingLeft: 1,
+                                paddingRight: 1,
+                                paddingBottom: 0,
+                            },
+                        },
+                    }}
                     initialState={{
                         columns: {columnVisibilityModel: {publicId: false}}
                     }}
@@ -431,9 +514,6 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
             </Box>
 
             <UploadVideo open={isUploadDialogOpen} handleClose={() => setIsUploadDialogOpen(false)}/>
-            {currentVideoToEdit &&
-                <EditVideoDescriptionDialog open={isEditDialogOpen} handleClose={handleCloseEditDialog}
-                                            video={currentVideoToEdit}/>}
             {currentVideoToProcess &&
                 <ProcessVideoDialog open={isProcessDialogOpen} handleClose={handleCloseProcessDialog}
                                     video={currentVideoToProcess}/>}
@@ -469,9 +549,9 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
                         timeout: 0
                     }
                 }}
-                style={{ transition: 'none' }}
+                style={{transition: 'none'}}
             >
-                <Box sx={{ position: 'relative', transition: 'none' }}>
+                <Box sx={{position: 'relative', transition: 'none'}}>
                     <IconButton
                         aria-label="close video player"
                         onClick={handleClosePlayer}
@@ -489,17 +569,11 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
                             }
                         }}
                     >
-                        <CloseIcon />
+                        <CloseIcon/>
                     </IconButton>
 
                     {videoUrl ? (
-                        <Box
-                            sx={{
-                                position: 'relative',
-                                transition: 'none',
-                                '&:focus': { outline: 'none' } // Remove outline when focused
-                            }}
-                        >
+                        <Box sx={{position: 'relative', '&:focus': {outline: 'none'}}}>
                             <video
                                 key={videoUrl}
                                 src={videoUrl}
@@ -508,40 +582,7 @@ const VideoList: React.FC<VideoListProps> = ({logOut}) => {
                                 playsInline
                                 disablePictureInPicture
                                 controlsList="nodownload nofullscreen nopictureinpicture"
-                                style={{
-                                    display: 'block',
-                                    maxHeight: '90vh',
-                                    transition: 'none'
-                                }}
-                                onLoadedMetadata={(e) => {
-                                    // Set the dialog size based on video dimensions with no animation
-                                    const video = e.target as HTMLVideoElement;
-                                    const videoWidth = video.videoWidth;
-                                    const videoHeight = video.videoHeight;
-
-                                    // Adjust if video is too large for screen
-                                    const maxWidth = window.innerWidth * 0.9;
-                                    const maxHeight = window.innerHeight * 0.9;
-
-                                    let width = videoWidth;
-                                    let height = videoHeight;
-
-                                    if (width > maxWidth) {
-                                        const ratio = maxWidth / width;
-                                        width = maxWidth;
-                                        height = height * ratio;
-                                    }
-
-                                    if (height > maxHeight) {
-                                        const ratio = maxHeight / height;
-                                        height = maxHeight;
-                                        width = width * ratio;
-                                    }
-
-                                    video.style.width = `${width}px`;
-                                    video.style.height = `${height}px`;
-                                    video.style.transition = 'none';
-                                }}
+                                style={{display: 'block', maxHeight: '90vh', maxWidth: '90vw'}}
                                 onError={() => {
                                     setSnackbarMessage("Error loading video");
                                     setSnackbarOpen(true);
