@@ -44,10 +44,12 @@ function AppContent() {
                     <Stack direction="row" spacing={1} alignItems="center">
                         {isAuthenticated && (
                             <>
+                                <Button color="inherit" component={RouterLink} to="/">
+                                    Main
+                                </Button>
                                 <Button color="inherit" component={RouterLink} to="/archive">
                                     Archive
                                 </Button>
-                                {/* Use the coordinated handleLogout */}
                                 <Button color="inherit" onClick={handleLogout}>
                                     Log out
                                 </Button>
