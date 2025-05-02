@@ -22,11 +22,12 @@ import DownloadIcon from '@mui/icons-material/Download';
 import CloudDownloadIcon from '@mui/icons-material/CloudDownload';
 import VideoSettingsIcon from '@mui/icons-material/VideoSettings';
 import CloseIcon from '@mui/icons-material/Close';
-import UploadVideo from "./UploadVideo";
+import UploadFileIcon from '@mui/icons-material/UploadFile';
 import ProcessVideoDialog from "./ProcessVideoDialog";
 import {PaginatedVideoResponse, UpdateVideoRequest, VideoResponse, VideoStatus} from "../types";
 import {AxiosResponse} from "axios";
 import {parseApiError} from '../utils/errorUtils';
+import {useVideoUpload} from '../hooks/useVideoUpload';
 
 interface VideoRowModel extends GridValidRowModel, VideoResponse {
 }
@@ -48,8 +49,7 @@ const getStatusChipProps = (status: VideoStatus) => {
 const VideoList: React.FC = () => {
     const [snackbarOpen, setSnackbarOpen] = useState(false);
     const [snackbarMessage, setSnackbarMessage] = useState("");
-    const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
-    const [downloadingLatestId, setDownloadingLatestId] = useState<string | null>(null); // Keep setter
+    const [downloadingLatestId, setDownloadingLatestId] = useState<string | null>(null);
     const [downloadingOriginalId, setDownloadingOriginalId] = useState<string | null>(null);
     const [isProcessDialogOpen, setIsProcessDialogOpen] = useState(false);
     const [currentVideoToProcess, setCurrentVideoToProcess] = useState<VideoResponse | null>(null);
@@ -59,6 +59,14 @@ const VideoList: React.FC = () => {
     const [playingVideoId, setPlayingVideoId] = useState<string | null>(null);
 
     const queryClient = useQueryClient();
+
+    const {fileInputRef, isUploading, handleUploadClick, handleFileChange} = useVideoUpload({
+        showSnackbar: (message: string) => {
+            setSnackbarMessage(message);
+            setSnackbarOpen(true);
+        },
+    });
+
 
     const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
         page: 0,
@@ -316,11 +324,11 @@ const VideoList: React.FC = () => {
                 const isDownloadingOriginal = downloadingOriginalId === video.publicId;
                 const isAnyDownloadingForRow = isDownloadingLatest || isDownloadingOriginal;
                 const isProcessing = video.status === VideoStatus.PROCESSING;
-                const isActionDisabled = isDeleting || isUpdatingDescription || isAnyDownloadingForRow || isProcessing;
+                const isActionDisabled = isDeleting || isUpdatingDescription || isAnyDownloadingForRow || isProcessing || isUploading;
 
                 return (
                     <Tooltip title="Edit Description">
-                        <span> {/* Span for Tooltip when disabled */}
+                        <span>
                             <IconButton
                                 aria-label="edit description"
                                 size="medium"
@@ -384,7 +392,7 @@ const VideoList: React.FC = () => {
                 const isDownloadingOriginal = downloadingOriginalId === video.publicId;
                 const isAnyDownloadingForRow = isDownloadingLatest || isDownloadingOriginal;
                 const isProcessing = video.status === VideoStatus.PROCESSING;
-                const isActionDisabled = isDeleting || isUpdatingDescription || isAnyDownloadingForRow || isProcessing;
+                const isActionDisabled = isDeleting || isUpdatingDescription || isAnyDownloadingForRow || isProcessing || isUploading; // Include isUploading
 
                 const canDownloadLatest = video.status === VideoStatus.READY || video.status === VideoStatus.UPLOADED;
                 const canProcess = video.status === VideoStatus.UPLOADED || video.status === VideoStatus.READY || video.status === VideoStatus.FAILED;
@@ -409,8 +417,8 @@ const VideoList: React.FC = () => {
                                 <IconButton aria-label="download original video"
                                             size="medium"
                                             onClick={() => handleDownloadOriginal(video.publicId)}
-                                            disabled={isActionDisabled}> {/* Removed !isDeleting */}
-                                    {isDownloadingOriginal ? // Corrected variable
+                                            disabled={isActionDisabled}>
+                                    {isDownloadingOriginal ?
                                         <CircularProgress size={20}/> :
                                         <CloudDownloadIcon fontSize="inherit"/>
                                     }
@@ -444,7 +452,7 @@ const VideoList: React.FC = () => {
     const rowCount = pageData?.totalElements ?? 0;
 
     const isGridInitiallyLoading = isFetchingVideos && !pageData;
-    const isGridVisuallyLoading = isFetchingVideos || isDeleting;
+    const isGridVisuallyLoading = isFetchingVideos || isDeleting || isUploading;
 
     if (isGridInitiallyLoading) {
         return <Box sx={{display: 'flex', justifyContent: 'center', mt: 4}}><CircularProgress/></Box>;
@@ -455,9 +463,14 @@ const VideoList: React.FC = () => {
 
     return (
         <Box sx={{display: 'flex', flexDirection: 'column', height: 'calc(100vh - 150px)', width: '100%'}}>
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} hidden accept=".mp4,video/mp4"/>
+
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{mb: 2, px: 1}}>
-                <Button variant="contained" onClick={() => setIsUploadDialogOpen(true)}
-                        disabled={isGridVisuallyLoading}>
+                <Button
+                    variant="contained"
+                    onClick={handleUploadClick}
+                    disabled={isGridVisuallyLoading}
+                    startIcon={isUploading ? <CircularProgress size={20} color="inherit"/> : <UploadFileIcon/>}>
                     Upload New Video
                 </Button>
             </Stack>
@@ -513,7 +526,6 @@ const VideoList: React.FC = () => {
                 />
             </Box>
 
-            <UploadVideo open={isUploadDialogOpen} handleClose={() => setIsUploadDialogOpen(false)}/>
             {currentVideoToProcess &&
                 <ProcessVideoDialog open={isProcessDialogOpen} handleClose={handleCloseProcessDialog}
                                     video={currentVideoToProcess}/>}
@@ -599,7 +611,7 @@ const VideoList: React.FC = () => {
                             height: '200px',
                             transition: 'none'
                         }}>
-                            {isLoadingVideo && <CircularProgress sx={{ color: 'white', transition: 'none' }} />}
+                            {isLoadingVideo && <CircularProgress sx={{color: 'white', transition: 'none'}}/>}
                         </Box>
                     )}
                 </Box>
