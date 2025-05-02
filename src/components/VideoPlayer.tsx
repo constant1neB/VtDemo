@@ -1,4 +1,4 @@
-import React, {ChangeEvent, useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -17,11 +17,12 @@ import ContentCutIcon from '@mui/icons-material/ContentCut';
 import AspectRatioIcon from '@mui/icons-material/AspectRatio';
 import DownloadIcon from '@mui/icons-material/Download';
 
-import {downloadVideo, listVideos, processVideo, uploadVideo} from '../api/videoApi';
+import {downloadVideo, listVideos, processVideo} from '../api/videoApi';
 import {EditOptions, PaginatedVideoResponse, VideoResponse, VideoStatus} from '../types';
 import {parseApiError} from '../utils/errorUtils';
 import {AxiosResponse} from 'axios';
 import {useVideoPlayer} from '../context/VideoPlayerContext';
+import {useVideoUpload} from '../hooks/useVideoUpload';
 
 const getStatusStyle = (status: VideoStatus | undefined) => {
     switch (status) {
@@ -47,7 +48,18 @@ const VideoPlayer: React.FC = () => {
     const [processingType, setProcessingType] = useState<'mute' | 'cut' | 'resize' | null>(null);
     const [snackbar, setSnackbar] = useState({open: false, message: ""});
 
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const {fileInputRef, isUploading, handleUploadClick, handleFileChange} = useVideoUpload({
+        onSuccess: (data, file) => {
+            setPlayerVideo(data, file);
+        },
+        onError: () => {
+            clearPlayerVideo();
+        },
+        showSnackbar: (message: string) => {
+            setSnackbar({open: true, message});
+        }
+    });
+
     useEffect(() => {
         let objectUrl: string | null = null;
 
@@ -142,20 +154,7 @@ const VideoPlayer: React.FC = () => {
 
 
     // --- Mutations ---
-    const {mutate: uploadMutate, isPending: isUploading} = useMutation<
-        VideoResponse, Error, { file: File }
-    >({
-        mutationFn: (vars) => uploadVideo(vars.file, null),
-        onSuccess: (data, vars) => {
-            setPlayerVideo(data, vars.file);
-            showSnackbar(`Video '${vars.file.name}' uploaded successfully.`);
-        },
-        onError: (error: Error) => {
-            const message = parseApiError(error, "Upload failed.");
-            showSnackbar(message);
-            clearPlayerVideo();
-        },
-    });
+    // Upload mutation is now handled by useVideoUpload hook
 
     const {mutate: processMutate} = useMutation<
         void, Error, { publicId: string; options: EditOptions; type: 'mute' | 'cut' | 'resize' }
@@ -164,8 +163,9 @@ const VideoPlayer: React.FC = () => {
             setIsProcessing(true);
             setProcessingType(vars.type);
             if (uploadedVideoMeta) {
+                // Optimistically update the status in context
                 const optimisticMeta = {...uploadedVideoMeta, status: VideoStatus.PROCESSING};
-                setPlayerVideo(optimisticMeta, null);
+                setPlayerVideo(optimisticMeta, null); // Keep file if present, but meta shows processing
             }
             await processVideo(vars.publicId, vars.options);
         },
@@ -237,19 +237,6 @@ const VideoPlayer: React.FC = () => {
     };
 
     // --- Event Handlers ---
-    const handleUploadClick = () => {
-        fileInputRef.current?.click();
-    };
-    const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (file) {
-            clearPlayerVideo();
-            uploadMutate({file});
-        }
-        if (event.target) {
-            event.target.value = '';
-        }
-    };
     const getCutTimes = useCallback((): { startTime: number; endTime: number } | null => {
         const startTimeStr = window.prompt("Enter cut start time (seconds, e.g., 0):", "0");
         if (startTimeStr === null) return null;
@@ -352,15 +339,12 @@ const VideoPlayer: React.FC = () => {
             }}>
                 {localVideoUrl ? (
                     <video
-                        // Use the localVideoUrl as key to force re-render when it changes
                         key={localVideoUrl}
                         src={localVideoUrl}
                         controls
                         style={{maxWidth: '100%', maxHeight: '100%', display: 'block'}}
-                        preload="metadata" // Preload metadata for duration etc.
+                        preload="metadata"
                         onError={(e) => {
-                            // This might still fire if the blob URL becomes invalid somehow,
-                            // but the primary cause should be fixed.
                             console.error("HTML Video Element Error:", e);
                             showSnackbar("Error loading video source.");
                         }}
@@ -387,7 +371,8 @@ const VideoPlayer: React.FC = () => {
                    sx={{width: '100%', maxWidth: '800px', flexWrap: 'wrap'}}>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} hidden accept=".mp4,video/mp4"/>
                 <Tooltip title="Upload New Video"><span><Button variant="contained" startIcon={isUploading ?
-                    <CircularProgress size={20} color="inherit"/> : <UploadFileIcon/>} onClick={handleUploadClick}
+                    <CircularProgress size={20} color="inherit"/> : <UploadFileIcon/>}
+                                                                onClick={handleUploadClick}
                                                                 disabled={isUploading || isProcessing}>Upload</Button></span></Tooltip>
                 <Tooltip title="Mute Audio"><span><IconButton aria-label="mute video"
                                                               onClick={() => handleEditAction('mute')}
