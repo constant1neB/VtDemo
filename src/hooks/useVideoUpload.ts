@@ -63,7 +63,6 @@ export function useVideoUpload({ onSuccess, onError, showSnackbar }: UseVideoUpl
     const handleFileChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (file) {
-            // Always upload with null description by default
             uploadMutate({ file: file, description: null });
         }
         if (event.target) {

@@ -1,5 +1,3 @@
-// src/types.ts
-
 // --- Authentication ---
 export type AccountCredentials = {
   username: string;
@@ -84,15 +82,6 @@ export type EditOptions = {
   cutEndTime?: number | null;
   mute: boolean; // Required
   targetResolutionHeight?: number | null;
-};
-
-// --- Frontend Specific ---
-
-// Used internally after fetching download blob
-export type VideoDownloadDetails = {
-  blob: Blob;
-  filename: string;
-  mimeType: string;
 };
 
 // --- Error Handling ---

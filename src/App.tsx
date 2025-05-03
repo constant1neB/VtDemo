@@ -69,7 +69,7 @@ function AppContent() {
                         // --- Authenticated Routes ---
                         <>
                             <Route path="/" element={<VideoPlayer />} />
-                            <Route path="/archive" element={<VideoList logOut={handleLogout} />} />
+                            <Route path="/archive" element={<VideoList />} />
                             <Route path="/login" element={<Navigate to="/" replace />} />
                             <Route path="/register" element={<Navigate to="/" replace />} />
                             <Route path="/resend-verification" element={<Navigate to="/" replace />} />

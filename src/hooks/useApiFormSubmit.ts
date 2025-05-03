@@ -4,15 +4,15 @@ import { parseApiError } from '../utils/errorUtils';
 type ApiFunction<TData, TResponse> = (data: TData) => Promise<TResponse>;
 
 interface UseApiFormSubmitOptions<TResponse> {
-    onSuccess?: (response: TResponse) => void; // Optional success callback
-    successMessage?: string; // Optional generic success message
+    onSuccess?: (response: TResponse) => void;
+    successMessage?: string;
 }
 
 interface UseApiFormSubmitReturn<TData, TResponse> {
     isLoading: boolean;
     snackbarOpen: boolean;
     snackbarMessage: string;
-    isSubmitted: boolean; // Generic 'submitted' flag (can mean success or handled error)
+    isSubmitted: boolean;
     handleSubmit: (data: TData) => Promise<void>;
     closeSnackbar: () => void;
     _marker?: TResponse;
@@ -32,7 +32,7 @@ export function useApiFormSubmit<TData, TResponse>(
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
     const [snackbarMessage, setSnackbarMessage] = useState<string>("");
-    const [isSubmitted, setIsSubmitted] = useState<boolean>(false); // Tracks if submission attempt finished
+    const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
     const { onSuccess, successMessage } = options;
 
@@ -46,8 +46,8 @@ export function useApiFormSubmit<TData, TResponse>(
         setIsSubmitted(false); // Reset submitted state on new attempt
 
         try {
-            const response = await apiFunction(data); // Call the provided API function
-            setSnackbarMessage(successMessage ?? "Operation successful!"); // Use provided or default message
+            const response = await apiFunction(data);
+            setSnackbarMessage(successMessage ?? "Operation successful!");
             setSnackbarOpen(true);
             setIsSubmitted(true); // Mark as submitted (successfully)
 
@@ -58,12 +58,10 @@ export function useApiFormSubmit<TData, TResponse>(
 
         } catch (error: unknown) {
             console.error("API Form Submit Error:", error);
-            // Use the helper function to parse the error
-            const errorMessage = parseApiError(error); // Use default message from parser if needed
+            const errorMessage = parseApiError(error);
             setSnackbarMessage(errorMessage);
             setSnackbarOpen(true);
-            setIsSubmitted(true); // Mark as submitted (even on error, the attempt finished)
-            // Do not call onSuccess on error
+            setIsSubmitted(true);
         } finally {
             setIsLoading(false);
         }
