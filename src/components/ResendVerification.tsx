@@ -27,8 +27,8 @@ function ResendVerification() {
         {
 
             successMessage: "If an account exists for this email and requires verification, a new link has been sent.",
-            onSuccess: (/* response: AxiosResponse */) => { // Parameter is now typed correctly
-                setFormData({ email: '' }); // Clear form on success
+            onSuccess: () => {
+                setFormData({ email: '' });
             }
         }
     );
@@ -37,13 +37,12 @@ function ResendVerification() {
         setFormData({ ...formData, [event.target.name]: event.target.value });
     };
 
-    // Component's submit handler prepares data and calls the hook's handler
     const handleComponentSubmit = () => {
         if (!formData.email) {
             console.warn("Please enter your email address.");
             return;
         }
-        void handleApiSubmit(formData); // Call hook's submit function
+        void handleApiSubmit(formData);
     };
 
     return (
@@ -65,7 +64,7 @@ function ResendVerification() {
                         autoComplete="email"
                     />
                     <Button
-                        variant="contained" color="primary" onClick={handleComponentSubmit} // Call component's handler
+                        variant="contained" color="primary" onClick={handleComponentSubmit}
                         disabled={isLoading} sx={{ width: '300px', height: '40px' }}
                     >
                         {isLoading ? <CircularProgress size={24} color="inherit" /> : "Send Verification Email"}

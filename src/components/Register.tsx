@@ -21,7 +21,6 @@ function Register() {
 
     const navigate = useNavigate();
 
-    // Use the custom hook - CORRECTED TYPE ARGUMENT
     const {
         isLoading,
         snackbarOpen,
@@ -29,12 +28,11 @@ function Register() {
         isSubmitted: isSuccess,
         handleSubmit: handleApiSubmit,
         closeSnackbar
-    } = useApiFormSubmit<RegistrationRequest, AxiosResponse>( // Use AxiosResponse here
-        register, // Pass the register API function
+    } = useApiFormSubmit<RegistrationRequest, AxiosResponse>(
+        register,
         {
             successMessage: "Registration successful! Please check your email to verify your account.",
             onSuccess: () => {
-                // Clear form only on actual success
                 setFormData({ username: '', email: '', password: '', passwordConfirmation: '' });
             }
         }
@@ -44,21 +42,16 @@ function Register() {
         setFormData({ ...formData, [event.target.name]: event.target.value });
     };
 
-    // Component's submit handler prepares data and calls the hook's handler
     const handleRegisterSubmit = () => {
-        // --- Initial Validations ---
         if (formData.password !== formData.passwordConfirmation) {
-            // Rely on TextField error prop for immediate feedback
             console.warn("Passwords do not match");
             return;
         }
         if (!formData.username || !formData.email || !formData.password) {
-            // Rely on TextField required prop
             console.warn("Please fill in all required fields.");
             return;
         }
 
-        // Call the hook's submit function
         void handleApiSubmit(formData);
     };
 

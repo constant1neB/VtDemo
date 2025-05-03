@@ -8,7 +8,6 @@ import {
     GridPaginationModel,
     GridRenderCellParams,
     GridSortModel,
-    GridToolbar,
     GridValidRowModel
 } from "@mui/x-data-grid";
 import Button from "@mui/material/Button";
@@ -490,7 +489,7 @@ const VideoList: React.FC = () => {
                     sortModel={sortModel}
                     onSortModelChange={setSortModel}
                     disableRowSelectionOnClick
-                    slots={{toolbar: GridToolbar}}
+                    showToolbar
                     slotProps={{
                         toolbar: {
                             showQuickFilter: true,
